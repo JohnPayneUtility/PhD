@@ -1,0 +1,237 @@
+import dash
+from dash import dcc, html, Input, Output
+import plotly.graph_objs as go
+import networkx as nx
+import numpy as np
+from sklearn.manifold import MDS as MDS_sklearn
+
+
+import pickle
+
+with open('data.pkl', 'rb') as f:
+    all_trajectories_list = pickle.load(f)
+
+# Dash app setup
+app = dash.Dash(__name__)
+app.layout = html.Div([
+    html.H1("Trajectory Network Dashboard"),
+    dcc.Checklist(
+        id='options',
+        options=[
+            {'label': 'Show Labels', 'value': 'show_labels'},
+            {'label': 'Hide Nodes', 'value': 'hide_nodes'},
+            {'label': '3D Plot', 'value': 'plot_3D'},
+            {'label': 'Use Solution Iterations', 'value': 'use_solution_iterations'},
+            {'label': 'MDS Layout', 'value': 'MDS'}
+        ],
+        value=[]
+    ),
+    dcc.Graph(id='trajectory-plot')
+])
+
+
+@app.callback(
+    Output('trajectory-plot', 'figure'),
+    Input('options', 'value')
+)
+def update_plot(options):
+    show_labels = 'show_labels' in options
+    hide_nodes = 'hide_nodes' in options
+    plot_3D = 'plot_3D' in options
+    use_solution_iterations = 'use_solution_iterations' in options
+    MDS = 'MDS' in options
+
+    G = nx.DiGraph()
+
+    # Colors for different sets of trajectories
+    edge_colors = ['blue', 'orange', 'purple', 'green', 'brown', 'cyan', 'magenta']
+    node_color_shared = 'green'
+
+    # Add nodes and edges for each set of trajectories
+    node_mapping = {}  # To ensure unique solutions map to the same node
+    start_nodes = set()
+    end_nodes = set()
+    overall_best_node = None
+
+    # Function to calculate Hamming distance
+    def hamming_distance(sol1, sol2):
+        return sum(el1 != el2 for el1, el2 in zip(sol1, sol2))
+
+    # Function to add nodes and edges to the graph
+    def add_trajectories_to_graph(all_run_trajectories, edge_color):
+        for run_idx, (unique_solutions, unique_fitnesses, solution_iterations, transitions) in enumerate(all_run_trajectories):
+            for i, solution in enumerate(unique_solutions):
+                solution_tuple = tuple(solution)
+                if solution_tuple not in node_mapping:
+                    node_label = f"Solution {len(node_mapping) + 1}"
+                    node_mapping[solution_tuple] = node_label
+                    G.add_node(node_label, solution=solution, fitness=unique_fitnesses[i], iterations=solution_iterations[i], run_idx=run_idx, step=i)
+                else:
+                    node_label = node_mapping[solution_tuple]
+
+                # Set start and end nodes for coloring later
+                if i == 0:
+                    start_nodes.add(node_label)
+                if i == len(unique_solutions) - 1:
+                    end_nodes.add(node_label)
+
+            # Add edges based on transitions
+            for prev_solution, current_solution in transitions:
+                if prev_solution in node_mapping and current_solution in node_mapping:
+                    G.add_edge(node_mapping[prev_solution], node_mapping[current_solution], color=edge_color)
+
+    # Add all sets of trajectories to the graph
+    for idx, all_run_trajectories in enumerate(all_trajectories_list):
+        edge_color = edge_colors[idx % len(edge_colors)]  # Cycle through colors if there are more sets than colors
+        add_trajectories_to_graph(all_run_trajectories, edge_color)
+
+    # Find the overall best solution across all sets of trajectories
+    overall_best_fitness = max(
+        max(best_fitnesses) for all_run_trajectories in all_trajectories_list for _, best_fitnesses, _, _ in all_run_trajectories
+    )
+    for node, data in G.nodes(data=True):
+        if data['fitness'] == overall_best_fitness:
+            overall_best_node = node
+            break
+
+    # Prepare node colors
+    node_colors = []
+    for node in G.nodes():
+        if node == overall_best_node:
+            node_colors.append('red')
+        elif node in start_nodes:
+            node_colors.append('yellow')
+        elif node in end_nodes:
+            node_colors.append('grey')
+        else:
+            # Check if the node exists in multiple sets of trajectories
+            solution_tuple = next(key for key, value in node_mapping.items() if value == node)
+            count_in_sets = 0
+            for all_run_trajectories in all_trajectories_list:
+                for unique_solutions, _, _, _ in all_run_trajectories:
+                    if solution_tuple in set(tuple(sol) for sol in unique_solutions):
+                        count_in_sets += 1
+            if count_in_sets > 1:
+                node_colors.append(node_color_shared)
+            else:
+                node_colors.append('skyblue')
+
+    # Calculate node sizes
+    if hide_nodes:
+        # Node sizes set to zero (not shown)
+        node_sizes = [0 for node in G.nodes()]
+    elif use_solution_iterations:
+        # Node sizes based on solution iterations
+        node_sizes = [50 + G.nodes[node]['iterations'] * 20 for node in G.nodes()]
+    else:
+        # Node sizes based on the number of incoming edges (in-degree)
+        node_sizes = [50 + G.in_degree(node) * 50 for node in G.nodes()]
+
+    # Prepare node positions
+    if MDS:
+        # Use MDS to position nodes based on dissimilarity (Hamming distance)
+        solutions = [data['solution'] for _, data in G.nodes(data=True)]
+        n = len(solutions)
+        dissimilarity_matrix = np.zeros((n, n))
+        for i in range(n):
+            for j in range(n):
+                dissimilarity_matrix[i][j] = hamming_distance(solutions[i], solutions[j])
+
+        mds = MDS_sklearn(n_components=2, dissimilarity='precomputed', random_state=42)
+        positions_2d = mds.fit_transform(dissimilarity_matrix)
+        pos = {node: positions_2d[i] for i, node in enumerate(G.nodes())}
+    else:
+        # Use default spring layout
+        pos = nx.spring_layout(G, dim=2 if not plot_3D else 3)
+
+    # Prepare Plotly traces
+    edge_trace = []
+    for edge in G.edges(data=True):
+        x0, y0 = pos[edge[0]][0], pos[edge[0]][1]
+        x1, y1 = pos[edge[1]][0], pos[edge[1]][1]
+        trace = go.Scatter(
+            x=[x0, x1, None],
+            y=[y0, y1, None],
+            mode='lines',
+            line=dict(width=2, color=edge[2].get('color', 'black')),
+            hoverinfo='none'
+        )
+        edge_trace.append(trace)
+
+    if plot_3D:
+        # 3D Plotting logic
+        fig = go.Figure()
+        for edge in G.edges(data=True):
+            x0, y0, z0 = pos[edge[0]][0], pos[edge[0]][1], G.nodes[edge[0]]['fitness']
+            x1, y1, z1 = pos[edge[1]][0], pos[edge[1]][1], G.nodes[edge[1]]['fitness']
+            trace = go.Scatter3d(
+                x=[x0, x1],
+                y=[y0, y1],
+                z=[z0, z1],
+                mode='lines',
+                line=dict(width=2, color=edge[2].get('color', 'black')),
+                hoverinfo='none'
+            )
+            fig.add_trace(trace)
+
+        node_trace_3d = go.Scatter3d(
+            x=[pos[node][0] for node in G.nodes()],
+            y=[pos[node][1] for node in G.nodes()],
+            z=[G.nodes[node]['fitness'] for node in G.nodes()],
+            mode='markers+text' if show_labels else 'markers',
+            marker=dict(
+                sizemode='area',  # Makes the node size scale with zoom
+                size=node_sizes,
+                color=node_colors,
+                colorscale='YlGnBu',
+                line_width=2
+            ),
+            text=[str(G.nodes[node]['fitness']) for node in G.nodes()],
+            hoverinfo='text'
+        )
+        fig.add_trace(node_trace_3d)
+        fig.update_layout(
+            title="3D Trajectory Network Plot",
+            width=800,
+            height=800,
+            scene=dict(zaxis_title='fitness')
+        )
+    else:
+        node_trace = go.Scatter(
+            x=[],
+            y=[],
+            text=[],
+            mode='markers+text' if show_labels else 'markers',
+            hoverinfo='text',
+            marker=dict(
+                sizemode='area',  # Makes the node size scale with zoom
+                showscale=False,
+                colorscale='YlGnBu',
+                size=node_sizes,
+                color=node_colors,
+                line_width=2
+            )
+        )
+
+        for node in G.nodes(data=True):
+            x, y = pos[node[0]]
+            node_trace['x'] += tuple([x])
+            node_trace['y'] += tuple([y])
+            node_trace['text'] += tuple([str(node[1].get('fitness', ''))])
+
+        fig = go.Figure(data=edge_trace + [node_trace],
+                        layout=go.Layout(
+                            title='Trajectory Network Plot',
+                            width=800,
+                            height=800,
+                            showlegend=False,
+                            hovermode='closest',
+                            margin=dict(b=20, l=5, r=5, t=40),
+                            xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+                            yaxis=dict(showgrid=False, zeroline=False, showticklabels=False)))
+    return fig
+
+
+if __name__ == '__main__':
+    app.run_server(debug=True)
+  
