@@ -4,6 +4,7 @@ import plotly.graph_objs as go
 import networkx as nx
 import numpy as np
 from sklearn.manifold import MDS as MDS_sklearn
+from sklearn.manifold import TSNE
 
 
 import pickle
@@ -37,7 +38,8 @@ app.layout = html.Div([
         options=[
             {'label': 'Fruchterman Reignold force directed', 'value': 'spring'},
             {'label': 'Kamada Kawai force directed', 'value': 'kamada_kawai'},
-            {'label': 'MDS dissimilarity', 'value': 'mds'}
+            {'label': 'MDS dissimilarity', 'value': 'mds'},
+            {'label': 't-SNE dissimilarity', 'value': 'tsne'}
         ],
         value='kamada_kawai',
         placeholder='Select a layout'
@@ -159,6 +161,21 @@ def update_plot(options, layout_value):
 
         mds = MDS_sklearn(n_components=2, dissimilarity='precomputed', random_state=42)
         positions_2d = mds.fit_transform(dissimilarity_matrix)
+        pos = {node: positions_2d[i] for i, node in enumerate(G.nodes())}
+    elif layout == 'tsne':
+        # Use t-SNE to position nodes based on dissimilarity (Hamming distance)
+        solutions = [data['solution'] for _, data in G.nodes(data=True)]
+        n = len(solutions)
+        dissimilarity_matrix = np.zeros((n, n))
+        for i in range(n):
+            for j in range(n):
+                dissimilarity_matrix[i][j] = hamming_distance(solutions[i], solutions[j])
+
+        # Initialize and fit t-SNE
+        tsne = TSNE(n_components=2, metric='precomputed', random_state=42, init='random')
+        positions_2d = tsne.fit_transform(dissimilarity_matrix)
+
+        # Create a dictionary to map nodes to positions
         pos = {node: positions_2d[i] for i, node in enumerate(G.nodes())}
     elif layout == 'kamada_kawai':
         pos = nx.kamada_kawai_layout(G, dim=2 if not plot_3D else 3)
