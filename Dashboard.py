@@ -42,7 +42,19 @@ app.layout = html.Div([
             {'label': 't-SNE dissimilarity', 'value': 'tsne'}
         ],
         value='kamada_kawai',
-        placeholder='Select a layout'
+        placeholder='Select a layout',
+        style={'width': '50%', 'marginTop': '10px'}
+    ),
+    dcc.Dropdown(
+        id='hover-info',
+        options=[
+            {'label': 'Show Fitness', 'value': 'fitness'},
+            {'label': 'Show Iterations', 'value': 'iterations'},
+            {'label': 'Show solutions', 'value': 'solutions'}
+        ],
+        value='fitness',
+        placeholder='Select hover information',
+        style={'width': '50%', 'marginTop': '10px'}
     ),
     dcc.Graph(id='trajectory-plot')
 ])
@@ -51,9 +63,10 @@ app.layout = html.Div([
 @app.callback(
     Output('trajectory-plot', 'figure'),
     [Input('options', 'value'),
-     Input('layout', 'value')]
+     Input('layout', 'value'),
+     Input('hover-info', 'value')]
 )
-def update_plot(options, layout_value):
+def update_plot(options, layout_value, hover_info_value):
     # Options from checkboxes
     show_labels = 'show_labels' in options
     hide_nodes = 'hide_nodes' in options
@@ -181,6 +194,15 @@ def update_plot(options, layout_value):
         pos = nx.kamada_kawai_layout(G, dim=2 if not plot_3D else 3)
     else:
         pos = nx.spring_layout(G, dim=2 if not plot_3D else 3)
+    
+    # create node_hover_text which holds node hover text information
+    node_hover_text = []
+    if hover_info_value == 'fitness':
+        node_hover_text = [str(G.nodes[node]['fitness']) for node in G.nodes()]
+    elif hover_info_value == 'iterations':
+        node_hover_text = [str(G.nodes[node]['iterations']) for node in G.nodes()]
+    elif hover_info_value == 'solutions':
+        node_hover_text = [str(G.nodes[node]['solution']) for node in G.nodes()]
 
     # Prepare Plotly traces
     edge_trace = []
@@ -224,7 +246,7 @@ def update_plot(options, layout_value):
                 colorscale='YlGnBu',
                 line_width=2
             ),
-            text=[str(G.nodes[node]['fitness']) for node in G.nodes()],
+            text=node_hover_text,
             hoverinfo='text'
         )
         fig.add_trace(node_trace_3d)
@@ -251,11 +273,11 @@ def update_plot(options, layout_value):
             )
         )
 
-        for node in G.nodes(data=True):
+        for i, node in enumerate(G.nodes(data=True)):
             x, y = pos[node[0]]
             node_trace['x'] += tuple([x])
             node_trace['y'] += tuple([y])
-            node_trace['text'] += tuple([str(node[1].get('fitness', ''))])
+            node_trace['text'] += tuple([node_hover_text[i]])
 
         fig = go.Figure(data=edge_trace + [node_trace],
                         layout=go.Layout(
