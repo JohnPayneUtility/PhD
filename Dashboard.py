@@ -15,16 +15,32 @@ with open('data.pkl', 'rb') as f:
 app = dash.Dash(__name__)
 app.layout = html.Div([
     html.H1("Trajectory Network Dashboard"),
+    html.P(
+        "This plot visualises the search trajectories of algorithms for optimisation problems. "
+        "Each trajectory is a squence of solutions corresponding to the best solution in the population over time. "
+        "Each node corresponds to the location of a best solution in the trajectory. "
+        "Edges are directed and connect two consecutive locations of best solutions in the search trajectory. ",
+        style={'fontSize': 16, 'marginTop': '10px'}
+    ),
     dcc.Checklist(
         id='options',
         options=[
             {'label': 'Show Labels', 'value': 'show_labels'},
             {'label': 'Hide Nodes', 'value': 'hide_nodes'},
             {'label': '3D Plot', 'value': 'plot_3D'},
-            {'label': 'Use Solution Iterations', 'value': 'use_solution_iterations'},
-            {'label': 'MDS Layout', 'value': 'MDS'}
+            {'label': 'Use Solution Iterations', 'value': 'use_solution_iterations'}
         ],
         value=[]
+    ),
+    dcc.Dropdown(
+        id='layout',
+        options=[
+            {'label': 'Fruchterman Reignold force directed', 'value': 'spring'},
+            {'label': 'Kamada Kawai force directed', 'value': 'kamada_kawai'},
+            {'label': 'MDS dissimilarity', 'value': 'mds'}
+        ],
+        value='kamada_kawai',
+        placeholder='Select a layout'
     ),
     dcc.Graph(id='trajectory-plot')
 ])
@@ -32,14 +48,18 @@ app.layout = html.Div([
 
 @app.callback(
     Output('trajectory-plot', 'figure'),
-    Input('options', 'value')
+    [Input('options', 'value'),
+     Input('layout', 'value')]
 )
-def update_plot(options):
+def update_plot(options, layout_value):
+    # Options from checkboxes
     show_labels = 'show_labels' in options
     hide_nodes = 'hide_nodes' in options
     plot_3D = 'plot_3D' in options
     use_solution_iterations = 'use_solution_iterations' in options
-    MDS = 'MDS' in options
+
+    # Options from dropdowns
+    layout = layout_value
 
     G = nx.DiGraph()
 
@@ -127,8 +147,8 @@ def update_plot(options):
         # Node sizes based on the number of incoming edges (in-degree)
         node_sizes = [50 + G.in_degree(node) * 50 for node in G.nodes()]
 
-    # Prepare node positions
-    if MDS:
+    # Prepare node positions based on selected layout
+    if layout == 'mds':
         # Use MDS to position nodes based on dissimilarity (Hamming distance)
         solutions = [data['solution'] for _, data in G.nodes(data=True)]
         n = len(solutions)
@@ -140,8 +160,9 @@ def update_plot(options):
         mds = MDS_sklearn(n_components=2, dissimilarity='precomputed', random_state=42)
         positions_2d = mds.fit_transform(dissimilarity_matrix)
         pos = {node: positions_2d[i] for i, node in enumerate(G.nodes())}
+    elif layout == 'kamada_kawai':
+        pos = nx.kamada_kawai_layout(G, dim=2 if not plot_3D else 3)
     else:
-        # Use default spring layout
         pos = nx.spring_layout(G, dim=2 if not plot_3D else 3)
 
     # Prepare Plotly traces
@@ -221,9 +242,9 @@ def update_plot(options):
 
         fig = go.Figure(data=edge_trace + [node_trace],
                         layout=go.Layout(
-                            title='Trajectory Network Plot',
-                            width=800,
-                            height=800,
+                            title='Search Trajectory Network Plot',
+                            width=700,
+                            height=700,
                             showlegend=False,
                             hovermode='closest',
                             margin=dict(b=20, l=5, r=5, t=40),
