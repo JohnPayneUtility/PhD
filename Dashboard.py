@@ -79,7 +79,7 @@ def update_plot(options, layout_value, hover_info_value):
     G = nx.DiGraph()
 
     # Colors for different sets of trajectories
-    edge_colors = ['blue', 'orange', 'purple', 'green', 'brown', 'cyan', 'magenta']
+    edge_colors = ['blue', 'orange', 'purple', 'brown', 'cyan', 'magenta']
     node_color_shared = 'green'
 
     # Add nodes and edges for each set of trajectories
