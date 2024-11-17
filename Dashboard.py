@@ -6,11 +6,16 @@ import numpy as np
 from sklearn.manifold import MDS as MDS_sklearn
 from sklearn.manifold import TSNE
 
-
+import os
 import pickle
 
-with open('data.pkl', 'rb') as f:
-    all_trajectories_list = pickle.load(f)
+# Get list of folders in the data directory
+data_folder = 'data'
+folder_options = [{'label': folder, 'value': folder} for folder in os.listdir(data_folder) if os.path.isdir(os.path.join(data_folder, folder))]
+
+
+# with open('data.pkl', 'rb') as f:
+#     all_trajectories_list = pickle.load(f)
 
 # Dash app setup
 app = dash.Dash(__name__)
@@ -23,6 +28,18 @@ app.layout = html.Div([
         "Edges are directed and connect two consecutive locations of best solutions in the search trajectory. ",
         style={'fontSize': 16, 'marginTop': '10px'}
     ),
+    html.Label("Select problem:"),
+    dcc.Dropdown(
+        id='folder-dropdown',
+        options=folder_options,
+        value=folder_options[0]['value'] if folder_options else None
+    ),
+    html.Label("Select algorithm data:"),
+    dcc.Dropdown(
+        id='file-dropdown',
+        multi=True
+    ),
+    dcc.Store(id='loaded-data-store'),
     dcc.Checklist(
         id='options',
         options=[
@@ -59,14 +76,50 @@ app.layout = html.Div([
     dcc.Graph(id='trajectory-plot')
 ])
 
+# File selection
+@app.callback(
+    Output('file-dropdown', 'options'),
+    Input('folder-dropdown', 'value')
+)
+def update_file_dropdown(selected_folder):
+    if selected_folder:
+        folder_path = os.path.join(data_folder, selected_folder)
+        file_options = [{'label': file, 'value': file} for file in os.listdir(folder_path) if file.endswith('.pkl')]
+        return file_options
+    return []
 
+# Data loading
+@app.callback(
+    Output('loaded-data-store', 'data'),
+    [Input('folder-dropdown', 'value'),
+     Input('file-dropdown', 'value')]
+)
+def load_data(selected_folder, selected_files):
+    if not selected_folder or not selected_files:
+        return []
+
+    # Load the selected data files
+    all_trajectories_list = []
+    for file_name in selected_files:
+        file_path = os.path.join(data_folder, selected_folder, file_name)
+        with open(file_path, 'rb') as f:
+            all_trajectories_list.append(pickle.load(f))
+
+    # print(all_trajectories_list)
+    return all_trajectories_list
+
+# Plotting
 @app.callback(
     Output('trajectory-plot', 'figure'),
     [Input('options', 'value'),
      Input('layout', 'value'),
-     Input('hover-info', 'value')]
+     Input('hover-info', 'value'),
+     Input('loaded-data-store', 'data')]
 )
-def update_plot(options, layout_value, hover_info_value):
+def update_plot(options, layout_value, hover_info_value, all_trajectories_list):
+    if not all_trajectories_list:
+        return go.Figure()
+    
     # Options from checkboxes
     show_labels = 'show_labels' in options
     hide_nodes = 'hide_nodes' in options
@@ -112,6 +165,8 @@ def update_plot(options, layout_value, hover_info_value):
 
             # Add edges based on transitions
             for prev_solution, current_solution in transitions:
+                prev_solution = tuple(prev_solution)
+                current_solution = tuple(current_solution)
                 if prev_solution in node_mapping and current_solution in node_mapping:
                     G.add_edge(node_mapping[prev_solution], node_mapping[current_solution], color=edge_color)
 
