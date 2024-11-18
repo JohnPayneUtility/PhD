@@ -25,12 +25,21 @@ app.layout = html.Div([
         "Edges are directed and connect two consecutive locations of best solutions in the search trajectory. ",
         style={'fontSize': 16, 'marginTop': '10px'}
     ),
-    html.Label("Select problem:"),
-    dcc.Dropdown(
-        id='folder-dropdown',
-        options=folder_options,
-        value=folder_options[0]['value'] if folder_options else None
-    ),
+    # html.Label("Select problem:"),
+    # dcc.Dropdown(
+    #     id='folder-dropdown',
+    #     options=folder_options,
+    #     value=folder_options[0]['value'] if folder_options else None
+    # ),
+    html.Div([
+        html.Label("Select problem:", style={'marginRight': '10px'}),
+        dcc.Dropdown(
+            id='folder-dropdown',
+            options=folder_options,
+            value=folder_options[0]['value'] if folder_options else None,
+            style={'width': '200px'}
+        ),
+    ], style={'display': 'flex', 'alignItems': 'center', 'marginTop': '20px'}),
     html.P(
         id='display-problem-info',
         style={'fontSize': 16, 'marginTop': '10px'}
