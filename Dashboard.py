@@ -8,16 +8,13 @@ from sklearn.manifold import TSNE
 
 import os
 import pickle
+import json
 
 # Get list of folders in the data directory
 data_folder = 'data'
 folder_options = [{'label': folder, 'value': folder} for folder in os.listdir(data_folder) if os.path.isdir(os.path.join(data_folder, folder))]
 
-
-# with open('data.pkl', 'rb') as f:
-#     all_trajectories_list = pickle.load(f)
-
-# Dash app setup
+# Create Dash app
 app = dash.Dash(__name__)
 app.layout = html.Div([
     html.H1("Trajectory Network Dashboard"),
@@ -33,6 +30,10 @@ app.layout = html.Div([
         id='folder-dropdown',
         options=folder_options,
         value=folder_options[0]['value'] if folder_options else None
+    ),
+    html.P(
+        id='display-problem-info',
+        style={'fontSize': 16, 'marginTop': '10px'}
     ),
     html.Label("Select algorithm data:"),
     dcc.Dropdown(
@@ -73,40 +74,66 @@ app.layout = html.Div([
         placeholder='Select hover information',
         style={'width': '50%', 'marginTop': '10px'}
     ),
-    dcc.Graph(id='trajectory-plot')
+    dcc.Graph(id='trajectory-plot'),
+    html.P(
+        id='display-algo-info',
+        style={'fontSize': 16, 'marginTop': '10px'}
+    )
 ])
 
 # File selection
 @app.callback(
-    Output('file-dropdown', 'options'),
+    [Output('file-dropdown', 'options'),
+    Output('display-problem-info', 'children')],
     Input('folder-dropdown', 'value')
 )
 def update_file_dropdown(selected_folder):
     if selected_folder:
         folder_path = os.path.join(data_folder, selected_folder)
         file_options = [{'label': file, 'value': file} for file in os.listdir(folder_path) if file.endswith('.pkl')]
-        return file_options
-    return []
+        
+        # Try to read 'info.txt' if it exists in the folder
+        info_file_path = os.path.join(folder_path, 'info.txt')
+        if os.path.exists(info_file_path):
+            with open(info_file_path, 'r') as info_file:
+                info_content = info_file.read()
+        else:
+            info_content = "Problem info not available"
+
+        return file_options, info_content
+    return [], "No problem selected"
 
 # Data loading
 @app.callback(
-    Output('loaded-data-store', 'data'),
+    [Output('loaded-data-store', 'data'),
+     Output('display-algo-info', 'children')],
     [Input('folder-dropdown', 'value'),
      Input('file-dropdown', 'value')]
 )
 def load_data(selected_folder, selected_files):
     if not selected_folder or not selected_files:
-        return []
+        return None, "No Algorithm selected"
 
     # Load the selected data files
     all_trajectories_list = []
+    all_info_files_list = []
+
     for file_name in selected_files:
         file_path = os.path.join(data_folder, selected_folder, file_name)
         with open(file_path, 'rb') as f:
             all_trajectories_list.append(pickle.load(f))
+        
+        info_filename = file_name.replace('pkl', 'txt')
+        info_file_path = os.path.join(data_folder, selected_folder, info_filename)
+        if os.path.exists(info_file_path):
+            with open(info_file_path, 'r') as info_file:
+                # info_content = info_file.read()
+                all_info_files_list.append(info_file.read())
+        else:
+            all_info_files_list.append("Algo info not available")
 
     # print(all_trajectories_list)
-    return all_trajectories_list
+    return all_trajectories_list, "\n".join(all_info_files_list)
 
 # Plotting
 @app.callback(
