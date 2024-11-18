@@ -17,7 +17,7 @@ folder_options = [{'label': folder, 'value': folder} for folder in os.listdir(da
 # Create Dash app
 app = dash.Dash(__name__)
 app.layout = html.Div([
-    html.H1("Trajectory Network Dashboard"),
+    html.H1("Search Trajectory Network Dashboard"),
     html.P(
         "This plot visualises the search trajectories of algorithms for optimisation problems. "
         "Each trajectory is a squence of solutions corresponding to the best solution in the population over time. "
@@ -25,12 +25,6 @@ app.layout = html.Div([
         "Edges are directed and connect two consecutive locations of best solutions in the search trajectory. ",
         style={'fontSize': 16, 'marginTop': '10px'}
     ),
-    # html.Label("Select problem:"),
-    # dcc.Dropdown(
-    #     id='folder-dropdown',
-    #     options=folder_options,
-    #     value=folder_options[0]['value'] if folder_options else None
-    # ),
     html.Div([
         html.Label("Select problem:", style={'marginRight': '10px'}),
         dcc.Dropdown(
