@@ -44,6 +44,14 @@ app.layout = html.Div([
         multi=True
     ),
     dcc.Store(id='loaded-data-store'),
+    dcc.Slider(
+        id='n-runs-slider',
+        min=1,
+        max=10,
+        step=1,
+        value=5,  # Default value
+        marks={i: str(i) for i in range(1, 11)},
+    ),
     dcc.Checklist(
         id='options',
         options=[
@@ -144,9 +152,10 @@ def load_data(selected_folder, selected_files):
     [Input('options', 'value'),
      Input('layout', 'value'),
      Input('hover-info', 'value'),
-     Input('loaded-data-store', 'data')]
+     Input('loaded-data-store', 'data'),
+     Input('n-runs-slider', 'value')]
 )
-def update_plot(options, layout_value, hover_info_value, all_trajectories_list):
+def update_plot(options, layout_value, hover_info_value, all_trajectories_list, n_runs_display):
     if not all_trajectories_list:
         return go.Figure()
     
@@ -174,6 +183,17 @@ def update_plot(options, layout_value, hover_info_value, all_trajectories_list):
     # Function to calculate Hamming distance
     def hamming_distance(sol1, sol2):
         return sum(el1 != el2 for el1, el2 in zip(sol1, sol2))
+    
+    def select_top_runs_by_fitness(all_run_trajectories, n_runs_display):
+        # Sort runs by the best (highest) final fitness, in descending order
+        sorted_runs = sorted(all_run_trajectories, 
+                            key=lambda run: run[1][-1],  # Access the last fitness value in the unique_fitnesses list
+                            reverse=True)
+        
+        # Cap the number of runs to display
+        top_runs = sorted_runs[:n_runs_display]
+        
+        return top_runs
 
     # Function to add nodes and edges to the graph
     def add_trajectories_to_graph(all_run_trajectories, edge_color):
@@ -203,7 +223,8 @@ def update_plot(options, layout_value, hover_info_value, all_trajectories_list):
     # Add all sets of trajectories to the graph
     for idx, all_run_trajectories in enumerate(all_trajectories_list):
         edge_color = edge_colors[idx % len(edge_colors)]  # Cycle through colors if there are more sets than colors
-        add_trajectories_to_graph(all_run_trajectories, edge_color)
+        selected_trajectories = select_top_runs_by_fitness(all_run_trajectories, n_runs_display)
+        add_trajectories_to_graph(selected_trajectories, edge_color)
 
     # Find the overall best solution across all sets of trajectories
     overall_best_fitness = max(
