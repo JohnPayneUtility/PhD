@@ -8,7 +8,6 @@ from sklearn.manifold import TSNE
 
 import os
 import pickle
-import json
 
 # Get list of folders in the data directory
 data_folder = 'data'
