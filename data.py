@@ -139,10 +139,10 @@ def EA(NGEN, popsize, tournsize, MUTPB, indpb, len_sol, fitness_function, fitnes
             population[weakest_idx] = mutant  # Replace it with the mutated individual
 
         # Add the elite individuals back to the population
-        population.extend(elites)
+        # population.extend(elites)
 
         # Create the new population by combining elites and offspring
-        # population = elites + offspring
+        population = elites + offspring
 
         # Record current population
         record_population_state(data, population, toolbox, true_fitness_function, true_fitness_params)
@@ -326,21 +326,21 @@ def save_problem(problem_info, problem_name):
 # Define problem and parameters and conduct runs
 # Problem information
 problem_name = 'OneMax_10items'
-n_items = 10
+n_items = 100
 problem_info = {
     'number of items': n_items,
 }
 
 # Algorithm information
 EA_params = {
-    'NGEN': 500, # Number of generations
+    'NGEN': 1000, # Number of generations
     'popsize': 100, # Population size
     'tournsize': 30, # Tournament selection size
     'MUTPB': 1, # Mutation probability
-    'indpb': 0.2, # per-gene mutation probability
+    'indpb': 0.05, # per-gene mutation probability
     'len_sol': n_items, # solution length
     'fitness_function': OneMax_fitness, # algorithm objective function
-    'fitness_params': {'noise_function': random_bit_flip, 'noise_intensity': 3}, # objective function parameters
+    'fitness_params': {'noise_function': random_bit_flip, 'noise_intensity': 0}, # objective function parameters
     'starting_solution': generate_zero_solution(n_items), # Specified starting solution for all individuals
     'true_fitness_function': OneMax_fitness, # noise-less fitness function for performance evaluation
     'true_fitness_params': {}, # noise-less fitnes function parameters
@@ -359,16 +359,16 @@ UMDA_params = {
 }
 
 # conduct runs
-algo_name = 'EA_g500_p100_t30_noise3'
-data = conduct_runs(1, EA, EA_params)
+algo_name = 'EA_g500_p100_t30_Test'
+data = conduct_runs(3, EA, EA_params)
 save_data(data, problem_name, algo_name)
 save_parameters(EA_params, problem_name, algo_name)
 save_problem(problem_info, problem_name)
 
-algo_name = 'UMDA_g500_p100_s50_noise3'
-data = conduct_runs(1, UMDA, UMDA_params)
-save_data(data, problem_name, algo_name)
-save_parameters(EA_params, problem_name, algo_name)
-save_problem(problem_info, problem_name)
+# algo_name = 'UMDA_g500_p100_s50_Test'
+# data = conduct_runs(1, UMDA, UMDA_params)
+# save_data(data, problem_name, algo_name)
+# save_parameters(EA_params, problem_name, algo_name)
+# save_problem(problem_info, problem_name)
 
 print('all runs complete')
