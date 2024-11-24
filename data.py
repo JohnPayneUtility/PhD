@@ -344,10 +344,11 @@ def save_problem(problem_info, problem_name):
 # Problem information
 problem_name = 'OneMax_10items_V2'
 # problem_name = 'rastrigin_N10A10'
-n_items = 100
+n_items = 10
 problem_info = {
     'number of items': n_items,
 }
+n_runs = 5
 
 # attr_function = (random.uniform, -5.12, 5.12) # attribute function for rastrigin
 attr_function = (random.randint, 0, 1) # binary attribute function
@@ -389,8 +390,8 @@ fitness_function_true = (OneMax_fitness, {})
 # Algorithm information
 EA_params = {
     'NGEN': 500, # Number of generations
-    'popsize': 100, # Population size
-    'tournsize': 30, # Tournament selection size
+    'popsize': 10, # Population size
+    'tournsize': 3, # Tournament selection size
     'len_sol': n_items, # solution length
     'weights': (1.0,),
     'attr_function': attr_function,
@@ -402,8 +403,8 @@ EA_params = {
 }
 UMDA_params = {
     'NGEN': 500, # Number of generations
-    'popsize': 100, # Population size
-    'selectsize': 50, # Size selected for distribution
+    'popsize': 10, # Population size
+    'selectsize': 5, # Size selected for distribution
     'len_sol': n_items, # solution length
     'weights': (1.0,),
     'attr_function': attr_function,
@@ -415,26 +416,26 @@ UMDA_params = {
 
 # conduct runs
 algo_name = 'EA_g500_p100_e10_t30_N0'
-data = conduct_runs(3, EA, EA_params)
+data = conduct_runs(n_runs, EA, EA_params)
 save_data(data, problem_name, algo_name)
 save_parameters(EA_params, problem_name, algo_name)
 save_problem(problem_info, problem_name)
 
 algo_name = 'UMDA_g500_p100_s50_N0'
-data = conduct_runs(3, UMDA, UMDA_params)
+data = conduct_runs(n_runs, UMDA, UMDA_params)
 save_data(data, problem_name, algo_name)
 save_parameters(EA_params, problem_name, algo_name)
 save_problem(problem_info, problem_name)
 
-fitness_function = (OneMax_fitness, {'noise_function': random_bit_flip, 'noise_intensity': 50})
+UMDA_params['fitness_function'] = (OneMax_fitness, {'noise_function': random_bit_flip, 'noise_intensity': 3})
 algo_name = 'EA_g500_p100_e10_t30_N50'
-data = conduct_runs(3, EA, EA_params)
+data = conduct_runs(n_runs, EA, EA_params)
 save_data(data, problem_name, algo_name)
 save_parameters(EA_params, problem_name, algo_name)
 save_problem(problem_info, problem_name)
 
 algo_name = 'UMDA_g500_p100_s50_N50'
-data = conduct_runs(3, UMDA, UMDA_params)
+data = conduct_runs(n_runs, UMDA, UMDA_params)
 save_data(data, problem_name, algo_name)
 save_parameters(EA_params, problem_name, algo_name)
 save_problem(problem_info, problem_name)
