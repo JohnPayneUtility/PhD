@@ -49,8 +49,14 @@ def eval_ind_kp(individual, items_dict, capacity, penalty=1):
             return (0,)
     return (value,) # Not over capacity return value
 
+def rastrigin_eval(individual, amplitude=10):
+    A = amplitude
+    n = len(individual)
+    fitness = A * n + sum((x ** 2 - A * np.cos(2 * np.pi * x)) for x in individual),
+    return fitness
+
 # Population recording
-def record_population_state(data, population, toolbox, true_fitness_function, true_fitness_params):
+def record_population_state(data, population, toolbox, true_fitness_function):
     # Unpack the data list
     all_generations, best_solutions, best_fitnesses, true_fitnesses = data
 
@@ -62,36 +68,43 @@ def record_population_state(data, population, toolbox, true_fitness_function, tr
     
     # If a true fitness function is provided, calculate the true fitness of the best solution
     if true_fitness_function is not None:
-        if true_fitness_params is None:
-            true_fitness_params = {}
-        true_fitness = true_fitness_function(best_individual, **true_fitness_params)
+        true_fitness = true_fitness_function[0](best_individual, **true_fitness_function[1])
         true_fitnesses.append(true_fitness[0])
     else:
         true_fitnesses.append(best_individual.fitness.values[0])
 
 # Algorithm functions
 # EA
-def EA(NGEN, popsize, tournsize, MUTPB, indpb, len_sol, fitness_function, fitness_params=None, starting_solution=None, true_fitness_function=None, true_fitness_params=None, n_elite=1):
+def EA(NGEN, popsize, tournsize, len_sol, weights, attr_function=None, mutate_function=None, fitness_function=None, starting_solution=None, true_fitness_function=None, n_elite=1):
     # Check if the fitness and individual creators have been defined; if not, define them
     if not hasattr(creator, "CustomFitness"):
-        creator.create("CustomFitness", base.Fitness, weights=(1.0,))
+        creator.create("CustomFitness", base.Fitness, weights=weights)
     if not hasattr(creator, "Individual"):
         creator.create("Individual", list, fitness=creator.CustomFitness)
 
     # Define the toolbox used for the evolutionary algorithm
     toolbox = base.Toolbox()
-    toolbox.register("attr_bool", random.randint, 0, 1)  # Define an attribute as a random binary value
-    toolbox.register("individual", tools.initRepeat, creator.Individual, toolbox.attr_bool, n=len_sol)  # Create an individual with len_sol attributes
-    toolbox.register("population", tools.initRepeat, list, toolbox.individual)  # Create a population of individuals
+
+    # Register attribute generation using parameters provided
+    if attr_function is None:
+        raise ValueError("Attribute generation function must be provided (e.g., random.uniform, -5.12, 5.12 or random.randint, 0, 1)")
+    toolbox.register("attribute", *attr_function)
+
+    # Register individual
+    toolbox.register("individual", tools.initRepeat, creator.Individual, toolbox.attribute, n=len_sol)
+    # Register population
+    toolbox.register("population", tools.initRepeat, list, toolbox.individual)
     
     # Register the evaluation function, allowing additional parameters to be passed
-    if fitness_params is None:
-        fitness_params = {}
-    toolbox.register("evaluate", lambda ind: fitness_function(ind, **fitness_params))
+    toolbox.register("evaluate", lambda ind: fitness_function[0](ind, **fitness_function[1]))
     
-    # register mutation and selection functions
-    toolbox.register("mutate", tools.mutFlipBit, indpb=indpb)  # Mutation function: flip a bit with a given probability
+    # register selection function
     toolbox.register("select", tools.selTournament, tournsize=tournsize)  # Selection function: tournament selection
+
+    # Register mutation function using parameters provided
+    if mutate_function is None:
+        raise ValueError("Mutation function must be provided (e.g., tools.mutGaussian, mu=0, sigma=1.0, indpb=indpb or tools.mutFlipBit, indpb=indpb)")
+    toolbox.register("mutate", lambda ind: mutate_function[0](ind, **mutate_function[1]))
 
     # Create an initial population of individuals
     population = toolbox.population(n=popsize)
@@ -104,13 +117,15 @@ def EA(NGEN, popsize, tournsize, MUTPB, indpb, len_sol, fitness_function, fitnes
     # Evaluate the initial population
     fitnesses = list(map(toolbox.evaluate, population))
     for ind, fit in zip(population, fitnesses):
+        # print(fit)
         ind.fitness.values = fit
 
-    # Initialise data to record every generation's population, best solutions, best fitness values, and true fitness values
+    # Initialise data recording
     all_generations, best_solutions, best_fitnesses, true_fitnesses = ([] for _ in range(4))
     data = [all_generations, best_solutions, best_fitnesses, true_fitnesses]
+
     # Record initial population
-    record_population_state(data, population, toolbox, true_fitness_function, true_fitness_params)
+    record_population_state(data, population, toolbox, true_fitness_function)
 
     # Evolutionary loop for each generation
     for gen in trange(NGEN, desc='Evolving EA Solutions'):
@@ -120,9 +135,8 @@ def EA(NGEN, popsize, tournsize, MUTPB, indpb, len_sol, fitness_function, fitnes
 
         # Apply mutation on the offspring with probability MUTPB
         for mutant in offspring:
-            if random.random() < MUTPB:
-                toolbox.mutate(mutant)  # Mutate the individual
-                del mutant.fitness.values  # Delete fitness to mark it as needing reevaluation
+            toolbox.mutate(mutant)  # Mutate the individual
+            del mutant.fitness.values  # Delete fitness to mark it as needing reevaluation
 
         # Evaluate the individuals with an invalid fitness (those that were mutated)
         invalid_ind = [ind for ind in offspring if not ind.fitness.valid]
@@ -145,12 +159,12 @@ def EA(NGEN, popsize, tournsize, MUTPB, indpb, len_sol, fitness_function, fitnes
         population = elites + offspring
 
         # Record current population
-        record_population_state(data, population, toolbox, true_fitness_function, true_fitness_params)
+        record_population_state(data, population, toolbox, true_fitness_function)
 
     return all_generations, best_solutions, best_fitnesses, true_fitnesses
 
 # UMDA
-def umda_update_full(len_sol, population, pop_size, select_size, replace_size, toolbox):
+def umda_update_full(len_sol, population, pop_size, select_size, toolbox):
     # select from population
     selected_population = tools.selBest(population, select_size)
 
@@ -165,23 +179,28 @@ def umda_update_full(len_sol, population, pop_size, select_size, replace_size, t
     
     return new_solutions
 
-def UMDA(NGEN, popsize, selectsize, len_sol, fitness_function, fitness_params=None, starting_solution=None, true_fitness_function=None, true_fitness_params=None):
+def UMDA(NGEN, popsize, selectsize, len_sol, weights, attr_function=None, mutate_function=None, fitness_function=None, starting_solution=None, true_fitness_function=None):
     # Check if the fitness and individual creators have been defined; if not, define them
     if not hasattr(creator, "CustomFitness"):
-        creator.create("CustomFitness", base.Fitness, weights=(1.0,))
+        creator.create("CustomFitness", base.Fitness, weights=weights)
     if not hasattr(creator, "Individual"):
         creator.create("Individual", list, fitness=creator.CustomFitness)
 
-    # Define the toolbox
+    # Define the toolbox used for the evolutionary algorithm
     toolbox = base.Toolbox()
-    toolbox.register("attr_bool", random.randint, 0, 1)
-    toolbox.register("individual", tools.initRepeat, creator.Individual, toolbox.attr_bool, n=len_sol)
+
+    # Register attribute generation using parameters provided
+    if attr_function is None:
+        raise ValueError("Attribute generation function must be provided (e.g., random.uniform, -5.12, 5.12 or random.randint, 0, 1)")
+    toolbox.register("attribute", *attr_function)
+
+    # Register individual
+    toolbox.register("individual", tools.initRepeat, creator.Individual, toolbox.attribute, n=len_sol)
+    # Register population
     toolbox.register("population", tools.initRepeat, list, toolbox.individual)
     
     # Register the evaluation function, allowing additional parameters to be passed
-    if fitness_params is None:
-        fitness_params = {}
-    toolbox.register("evaluate", lambda ind: fitness_function(ind, **fitness_params))
+    toolbox.register("evaluate", lambda ind: fitness_function[0](ind, **fitness_function[1]))
 
     # Create an initial population
     population = toolbox.population(n=popsize)
@@ -190,8 +209,6 @@ def UMDA(NGEN, popsize, selectsize, len_sol, fitness_function, fitness_params=No
     if starting_solution is not None:
         for ind in population:
             ind[:] = starting_solution[:]
-    
-    # print([ind[:] for ind in population[:5]])
 
     # Evaluate the initial population
     fitnesses = list(map(toolbox.evaluate, population))
@@ -203,18 +220,18 @@ def UMDA(NGEN, popsize, selectsize, len_sol, fitness_function, fitness_params=No
     data = [all_generations, best_solutions, best_fitnesses, true_fitnesses]
     
     # Record initial population
-    record_population_state(data, population, toolbox, true_fitness_function, true_fitness_params)
+    record_population_state(data, population, toolbox, true_fitness_function)
 
     # Evolutionary loop
     for gen in trange(NGEN, desc='Evolving UMDA solution'):
-        population = umda_update_full(len_sol, population, popsize, selectsize, 0, toolbox)
+        population = umda_update_full(len_sol, population, popsize, selectsize, toolbox)
 
         fitnesses = list(map(toolbox.evaluate, population))
         for ind, fit in zip(population, fitnesses):
             ind.fitness.values = fit
 
         # Record current population
-        record_population_state(data, population, toolbox, true_fitness_function, true_fitness_params)
+        record_population_state(data, population, toolbox, true_fitness_function)
 
     return all_generations, best_solutions, best_fitnesses, true_fitnesses
 
@@ -325,50 +342,101 @@ def save_problem(problem_info, problem_name):
 
 # Define problem and parameters and conduct runs
 # Problem information
-problem_name = 'OneMax_10items'
+problem_name = 'OneMax_10items_V2'
+# problem_name = 'rastrigin_N10A10'
 n_items = 100
 problem_info = {
     'number of items': n_items,
 }
 
+# attr_function = (random.uniform, -5.12, 5.12) # attribute function for rastrigin
+attr_function = (random.randint, 0, 1) # binary attribute function
+
+# mutate_function = (tools.mutGaussian, {'mu': 0, 'sigma': 1.0, 'indpb': 0.05})
+mutate_function = (tools.mutFlipBit, {'indpb': 0.05})
+
+fitness_function = (OneMax_fitness, {'noise_function': random_bit_flip, 'noise_intensity': 0})
+# fitness_function = (rastrigin_eval, {'amplitude':10})
+fitness_function_true = (OneMax_fitness, {})
+
+# # Algorithm information
+# EA_params = {
+#     'NGEN': 1000, # Number of generations
+#     'popsize': 100, # Population size
+#     'tournsize': 30, # Tournament selection size
+#     'MUTPB': 1, # Mutation probability
+#     'indpb': 0.05, # per-gene mutation probability
+#     'len_sol': n_items, # solution length
+#     'fitness_function': OneMax_fitness, # algorithm objective function
+#     'fitness_params': {'noise_function': random_bit_flip, 'noise_intensity': 0}, # objective function parameters
+#     'starting_solution': generate_zero_solution(n_items), # Specified starting solution for all individuals
+#     'true_fitness_function': OneMax_fitness, # noise-less fitness function for performance evaluation
+#     'true_fitness_params': {}, # noise-less fitnes function parameters
+#     'n_elite': 10
+# }
+# UMDA_params = {
+#     'NGEN': 500, # Number of generations
+#     'popsize': 100, # Population size
+#     'selectsize': 50, # Size selected for distribution
+#     'len_sol': n_items, # solution length
+#     'fitness_function': OneMax_fitness, # algorithm objective function
+#     'fitness_params': {'noise_function': random_bit_flip, 'noise_intensity': 3}, # objective function parameters
+#     'starting_solution': None, # Specified starting solution for all individuals
+#     'true_fitness_function': OneMax_fitness, # noise-less fitness function for performance evaluation
+#     'true_fitness_params': {} # noise-less fitnes function parameters
+# }
+
 # Algorithm information
 EA_params = {
-    'NGEN': 1000, # Number of generations
+    'NGEN': 500, # Number of generations
     'popsize': 100, # Population size
     'tournsize': 30, # Tournament selection size
-    'MUTPB': 1, # Mutation probability
-    'indpb': 0.05, # per-gene mutation probability
     'len_sol': n_items, # solution length
-    'fitness_function': OneMax_fitness, # algorithm objective function
-    'fitness_params': {'noise_function': random_bit_flip, 'noise_intensity': 0}, # objective function parameters
+    'weights': (1.0,),
+    'attr_function': attr_function,
+    'mutate_function': mutate_function,
+    'fitness_function': fitness_function, # algorithm objective function
     'starting_solution': generate_zero_solution(n_items), # Specified starting solution for all individuals
-    'true_fitness_function': OneMax_fitness, # noise-less fitness function for performance evaluation
-    'true_fitness_params': {}, # noise-less fitnes function parameters
-    'n_elite': 10
+    'true_fitness_function': fitness_function_true, # noise-less fitness function for performance evaluation
+    'n_elite': 1
 }
 UMDA_params = {
     'NGEN': 500, # Number of generations
     'popsize': 100, # Population size
     'selectsize': 50, # Size selected for distribution
     'len_sol': n_items, # solution length
-    'fitness_function': OneMax_fitness, # algorithm objective function
-    'fitness_params': {'noise_function': random_bit_flip, 'noise_intensity': 3}, # objective function parameters
+    'weights': (1.0,),
+    'attr_function': attr_function,
+    'mutate_function': None,
+    'fitness_function': fitness_function, # algorithm objective function
     'starting_solution': None, # Specified starting solution for all individuals
-    'true_fitness_function': OneMax_fitness, # noise-less fitness function for performance evaluation
-    'true_fitness_params': {} # noise-less fitnes function parameters
+    'true_fitness_function': fitness_function_true, # noise-less fitness function for performance evaluation
 }
 
 # conduct runs
-algo_name = 'EA_g500_p100_t30_Test'
+algo_name = 'EA_g500_p100_e10_t30_N0'
 data = conduct_runs(3, EA, EA_params)
 save_data(data, problem_name, algo_name)
 save_parameters(EA_params, problem_name, algo_name)
 save_problem(problem_info, problem_name)
 
-# algo_name = 'UMDA_g500_p100_s50_Test'
-# data = conduct_runs(1, UMDA, UMDA_params)
-# save_data(data, problem_name, algo_name)
-# save_parameters(EA_params, problem_name, algo_name)
-# save_problem(problem_info, problem_name)
+algo_name = 'UMDA_g500_p100_s50_N0'
+data = conduct_runs(3, UMDA, UMDA_params)
+save_data(data, problem_name, algo_name)
+save_parameters(EA_params, problem_name, algo_name)
+save_problem(problem_info, problem_name)
 
-print('all runs complete')
+fitness_function = (OneMax_fitness, {'noise_function': random_bit_flip, 'noise_intensity': 50})
+algo_name = 'EA_g500_p100_e10_t30_N50'
+data = conduct_runs(3, EA, EA_params)
+save_data(data, problem_name, algo_name)
+save_parameters(EA_params, problem_name, algo_name)
+save_problem(problem_info, problem_name)
+
+algo_name = 'UMDA_g500_p100_s50_N50'
+data = conduct_runs(3, UMDA, UMDA_params)
+save_data(data, problem_name, algo_name)
+save_parameters(EA_params, problem_name, algo_name)
+save_problem(problem_info, problem_name)
+
+print('complete')
