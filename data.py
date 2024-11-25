@@ -342,23 +342,23 @@ def save_problem(problem_info, problem_name):
 
 # Define problem and parameters and conduct runs
 # Problem information
-problem_name = 'OneMax_10items_V2'
+problem_name = 'rastriginN10A10'
 # problem_name = 'rastrigin_N10A10'
-n_items = 10
+n_items = 2
 problem_info = {
     'number of items': n_items,
 }
-n_runs = 5
+n_runs = 3
 
-# attr_function = (random.uniform, -5.12, 5.12) # attribute function for rastrigin
-attr_function = (random.randint, 0, 1) # binary attribute function
+attr_function = (random.uniform, -5.12, 5.12) # attribute function for rastrigin
+# attr_function = (random.randint, 0, 1) # binary attribute function
 
-# mutate_function = (tools.mutGaussian, {'mu': 0, 'sigma': 1.0, 'indpb': 0.05})
-mutate_function = (tools.mutFlipBit, {'indpb': 0.05})
+mutate_function = (tools.mutGaussian, {'mu': 0, 'sigma': 1.0, 'indpb': 0.05})
+# mutate_function = (tools.mutFlipBit, {'indpb': 0.05})
 
-fitness_function = (OneMax_fitness, {'noise_function': random_bit_flip, 'noise_intensity': 0})
-# fitness_function = (rastrigin_eval, {'amplitude':10})
-fitness_function_true = (OneMax_fitness, {})
+# fitness_function = (OneMax_fitness, {'noise_function': random_bit_flip, 'noise_intensity': 0})
+fitness_function = (rastrigin_eval, {'amplitude':10})
+# fitness_function_true = (OneMax_fitness, {})
 
 # # Algorithm information
 # EA_params = {
@@ -389,52 +389,39 @@ fitness_function_true = (OneMax_fitness, {})
 
 # Algorithm information
 EA_params = {
-    'NGEN': 500, # Number of generations
+    'NGEN': 100, # Number of generations
     'popsize': 10, # Population size
     'tournsize': 3, # Tournament selection size
     'len_sol': n_items, # solution length
-    'weights': (1.0,),
+    'weights': (-1.0,),
     'attr_function': attr_function,
     'mutate_function': mutate_function,
     'fitness_function': fitness_function, # algorithm objective function
-    'starting_solution': generate_zero_solution(n_items), # Specified starting solution for all individuals
-    'true_fitness_function': fitness_function_true, # noise-less fitness function for performance evaluation
+    'starting_solution': None, # Specified starting solution for all individuals
+    'true_fitness_function': None, # noise-less fitness function for performance evaluation
     'n_elite': 1
 }
 UMDA_params = {
-    'NGEN': 500, # Number of generations
+    'NGEN': 100, # Number of generations
     'popsize': 10, # Population size
     'selectsize': 5, # Size selected for distribution
     'len_sol': n_items, # solution length
-    'weights': (1.0,),
+    'weights': (-1.0,),
     'attr_function': attr_function,
     'mutate_function': None,
     'fitness_function': fitness_function, # algorithm objective function
     'starting_solution': None, # Specified starting solution for all individuals
-    'true_fitness_function': fitness_function_true, # noise-less fitness function for performance evaluation
+    'true_fitness_function': None, # noise-less fitness function for performance evaluation
 }
 
 # conduct runs
-algo_name = 'EA_g500_p100_e10_t30_N0'
+algo_name = 'EA_g100_p10_e1_t3'
 data = conduct_runs(n_runs, EA, EA_params)
 save_data(data, problem_name, algo_name)
 save_parameters(EA_params, problem_name, algo_name)
 save_problem(problem_info, problem_name)
 
-algo_name = 'UMDA_g500_p100_s50_N0'
-data = conduct_runs(n_runs, UMDA, UMDA_params)
-save_data(data, problem_name, algo_name)
-save_parameters(EA_params, problem_name, algo_name)
-save_problem(problem_info, problem_name)
-
-UMDA_params['fitness_function'] = (OneMax_fitness, {'noise_function': random_bit_flip, 'noise_intensity': 3})
-algo_name = 'EA_g500_p100_e10_t30_N50'
-data = conduct_runs(n_runs, EA, EA_params)
-save_data(data, problem_name, algo_name)
-save_parameters(EA_params, problem_name, algo_name)
-save_problem(problem_info, problem_name)
-
-algo_name = 'UMDA_g500_p100_s50_N50'
+algo_name = 'UMDA_g100_p10_s5'
 data = conduct_runs(n_runs, UMDA, UMDA_params)
 save_data(data, problem_name, algo_name)
 save_parameters(EA_params, problem_name, algo_name)
