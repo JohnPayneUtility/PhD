@@ -67,7 +67,8 @@ app.layout = html.Div([
             {'label': 'Fruchterman Reignold force directed', 'value': 'spring'},
             {'label': 'Kamada Kawai force directed', 'value': 'kamada_kawai'},
             {'label': 'MDS dissimilarity', 'value': 'mds'},
-            {'label': 't-SNE dissimilarity', 'value': 'tsne'}
+            {'label': 't-SNE dissimilarity', 'value': 'tsne'},
+            {'label': 'raw solution values', 'value': 'raw'}
         ],
         value='kamada_kawai',
         placeholder='Select a layout',
@@ -295,6 +296,10 @@ def update_plot(options, layout_value, hover_info_value, all_trajectories_list, 
 
         # Create a dictionary to map nodes to positions
         pos = {node: positions_2d[i] for i, node in enumerate(G.nodes())}
+    elif layout == 'raw':
+        # Directly use the 2D solution values as positions
+        solutions = [data['solution'] for _, data in G.nodes(data=True)]
+        pos = {node: solutions[i] for i, node in enumerate(G.nodes())}
     elif layout == 'kamada_kawai':
         pos = nx.kamada_kawai_layout(G, dim=2 if not plot_3D else 3)
     else:

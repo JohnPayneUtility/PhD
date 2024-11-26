@@ -342,7 +342,7 @@ def save_problem(problem_info, problem_name):
 
 # Define problem and parameters and conduct runs
 # Problem information
-problem_name = 'rastriginN10A10'
+problem_name = 'rastriginN2A10'
 # problem_name = 'rastrigin_N10A10'
 n_items = 2
 problem_info = {
@@ -353,13 +353,13 @@ n_runs = 3
 attr_function = (random.uniform, -5.12, 5.12) # attribute function for rastrigin
 # attr_function = (random.randint, 0, 1) # binary attribute function
 
-mutate_function = (tools.mutGaussian, {'mu': 0, 'sigma': 1.0, 'indpb': 0.05})
+mutate_function = (tools.mutGaussian, {'mu': 0, 'sigma': 0.1, 'indpb': 0.05})
 # mutate_function = (tools.mutFlipBit, {'indpb': 0.05})
 
 # fitness_function = (OneMax_fitness, {'noise_function': random_bit_flip, 'noise_intensity': 0})
 fitness_function = (rastrigin_eval, {'amplitude':10})
 # fitness_function_true = (OneMax_fitness, {})
-
+ 
 # # Algorithm information
 # EA_params = {
 #     'NGEN': 1000, # Number of generations
