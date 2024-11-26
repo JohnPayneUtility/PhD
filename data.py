@@ -165,17 +165,36 @@ def EA(NGEN, popsize, tournsize, len_sol, weights, attr_function=None, mutate_fu
 
 # UMDA
 def umda_update_full(len_sol, population, pop_size, select_size, toolbox):
-    # select from population
+    # Select from population
     selected_population = tools.selBest(population, select_size)
+    
+    # Determine the data type of the genes from the first individual in the population
+    gene_type = type(population[0][0])
+    
+    # Calculate marginal probabilities for binary solutions (assumes binary values are either 0 or 1)
+    if gene_type == int:
+        probabilities = np.mean(selected_population, axis=0)
 
-    # Calculate marginal propabilities
-    probabilities = np.mean(selected_population, axis=0)
+        new_solutions = []
+        for _ in range(pop_size):
+            new_solution = np.random.rand(len_sol) < probabilities
+            new_solution = creator.Individual(new_solution.astype(int).tolist())  # Create as DEAP Individual
+            new_solutions.append(new_solution)
 
-    new_solutions = []
-    for _ in range(pop_size):
-        new_solution = np.random.rand(len_sol) < probabilities
-        new_solution = creator.Individual(new_solution.astype(int).tolist())  # Create as DEAP Individual
-        new_solutions.append(new_solution)
+    # For float-based solutions, calculate mean and standard deviation
+    elif gene_type == float:
+        selected_array = np.array(selected_population)
+        means = np.mean(selected_array, axis=0)
+        stds = np.std(selected_array, axis=0)
+
+        new_solutions = []
+        for _ in range(pop_size):
+            new_solution = np.random.normal(means, stds, len_sol)
+            new_solution = creator.Individual(new_solution.tolist())  # Create as DEAP Individual
+            new_solutions.append(new_solution)
+
+    else:
+        raise ValueError("Unsupported gene type. Expected int or float.")
     
     return new_solutions
 
@@ -348,7 +367,7 @@ n_items = 2
 problem_info = {
     'number of items': n_items,
 }
-n_runs = 3
+n_runs = 5
 
 attr_function = (random.uniform, -5.12, 5.12) # attribute function for rastrigin
 # attr_function = (random.randint, 0, 1) # binary attribute function
