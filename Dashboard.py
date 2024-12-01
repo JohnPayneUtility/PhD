@@ -89,7 +89,8 @@ app.layout = html.Div([
     html.P(
         id='display-algo-info',
         style={'fontSize': 16, 'marginTop': '10px'}
-    )
+    ),
+    html.Div(id='unique-solutions-display', style={'marginTop': '20px'})
 ])
 
 # File selection
@@ -117,7 +118,8 @@ def update_file_dropdown(selected_folder):
 # Data loading
 @app.callback(
     [Output('loaded-data-store', 'data'),
-     Output('display-algo-info', 'children')],
+     Output('display-algo-info', 'children'),
+     Output('unique-solutions-display', 'children')],
     [Input('folder-dropdown', 'value'),
      Input('file-dropdown', 'value')]
 )
@@ -143,8 +145,13 @@ def load_data(selected_folder, selected_files):
         else:
             all_info_files_list.append("Algo info not available")
 
-    # print(all_trajectories_list)
-    return all_trajectories_list, "\n".join(all_info_files_list)
+    unique_solutions_text = ""
+    for idx, all_run_trajectories in enumerate(all_trajectories_list):
+        if all_run_trajectories:
+            first_run_unique_solutions = all_run_trajectories[0][1]  # Unique solutions from the first run
+            unique_solutions_text += f"Algorithm {idx + 1} - First Run Unique Solutions:\n{first_run_unique_solutions}\n\n"
+
+    return all_trajectories_list, "\n".join(all_info_files_list), unique_solutions_text
 
 # Plotting
 @app.callback(

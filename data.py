@@ -63,7 +63,7 @@ def record_population_state(data, population, toolbox, true_fitness_function):
 
     # Record the current population, the best solution, and the true fitness if applicable
     all_generations.append([ind[:] for ind in population])
-    best_individual = max(population, key=lambda ind: ind.fitness.values)  # Find the individual with the best fitness
+    best_individual = tools.selBest(population, 1)[0] 
     best_solutions.append(toolbox.clone(best_individual))  # Clone the best individual for recording
     best_fitnesses.append(best_individual.fitness.values[0])  # Record the best fitness value
     
@@ -135,6 +135,11 @@ def EA(NGEN, popsize, tournsize, len_sol, weights, attr_function=None, mutate_fu
 
     # Evolutionary loop for each generation
     for gen in trange(NGEN, desc='Evolving EA Solutions'):
+        # Select the best individuals from the current population to keep (elitism)
+        # print(f"Generation {gen}: Best Fitness Before Elitism: {max(ind.fitness.values[0] for ind in population)}")
+        elites = [toolbox.clone(ind) for ind in tools.selBest(population, n_elite)]
+        # print(f"Elites Fitness: {[ind.fitness.values[0] for ind in elites]}")
+
         # Select the offspring using tournament selection (cloning to avoid modifying the original individuals)
         n_offspring = popsize - n_elite
         offspring = [toolbox.clone(toolbox.select(population, 1)[0]) for _ in range(n_offspring)]
@@ -149,14 +154,16 @@ def EA(NGEN, popsize, tournsize, len_sol, weights, attr_function=None, mutate_fu
         fitnesses = map(toolbox.evaluate, invalid_ind)
         for ind, fit in zip(invalid_ind, fitnesses):
             ind.fitness.values = fit
+        
+        # print(f"Offspring Fitness: {[ind.fitness.values[0] for ind in offspring]}")
 
-        # Select the best individuals from the current population to keep (elitism)
-        elites = tools.selBest(population, n_elite)
+        # # Select the best individuals from the current population to keep (elitism)
+        # elites = tools.selBest(population, n_elite)
 
-        # Replace the weakest individuals in the population with the offspring
-        for mutant in offspring:
-            weakest_idx = min(range(len(population)), key=lambda idx: population[idx].fitness.values)  # Find the weakest individual
-            population[weakest_idx] = mutant  # Replace it with the mutated individual
+        # # Replace the weakest individuals in the population with the offspring
+        # for mutant in offspring:
+        #     weakest_idx = min(range(len(population)), key=lambda idx: population[idx].fitness.values)  # Find the weakest individual
+        #     population[weakest_idx] = mutant  # Replace it with the mutated individual
 
         # Add the elite individuals back to the population
         # population.extend(elites)
@@ -365,16 +372,36 @@ def save_problem(problem_info, problem_name):
     with open(file_path, 'w') as file:
         json.dump(serializable_info, file)
 
+def get_exp_name(function, parameters):
+    from datetime import datetime
+    function_name = function.__name__
+
+    now = datetime.now()
+    timestamp = now.strftime("%Y%m%d%H%M%S")
+    gen = parameters['NGEN']
+    pop = parameters['popsize']
+
+    exp_name = f"{function_name}_g{gen}_p{pop}_{timestamp}"
+    return exp_name
+
+
+def run_exp(algo, parameters, n_runs, problem_name, problem_info):
+    name = get_exp_name(algo, parameters)
+    data = conduct_runs(n_runs, algo, parameters)
+    save_data(data, problem_name, name)
+    save_parameters(parameters, problem_name, name)
+    save_problem(problem_info, problem_name)
+    print('Experiment Complete')
+
 # Define problem and parameters and conduct runs
 # Problem information
-problem_name = 'TestSpace'
-# problem_name = 'rastriginN2A10'
+# problem_name = 'TestSpace'
+problem_name = 'rastriginN2A10'
 # problem_name = 'rastrigin_N10A10'
 n_items = 2
 problem_info = {
     'number of items': n_items,
 }
-n_runs = 5
 
 attr_function = (random.uniform, -5.12, 5.12) # attribute function for rastrigin
 # attr_function = (random.randint, 0, 1) # binary attribute function
@@ -440,33 +467,10 @@ UMDA_params = {
     'true_fitness_function': None, # noise-less fitness function for performance evaluation
 }
 
-def get_exp_name(function, parameters):
-    from datetime import datetime
-    function_name = function.__name__
-
-    now = datetime.now()
-    timestamp = now.strftime("%Y%m%d%H%M%S")
-    gen = parameters['NGEN']
-    pop = parameters['popsize']
-
-    exp_name = f"{function_name}_g{gen}_p{pop}_t{timestamp}"
-    return exp_name
+n_runs = 5
+run_exp(EA, EA_params, n_runs, problem_name, problem_info)
+run_exp(UMDA, UMDA_params, n_runs, problem_name, problem_info)
 
 
-def run_exp(algo, parameters, n_runs, problem_name, problem_info):
-    name = get_exp_name(algo, parameters)
-    data = conduct_runs(n_runs, algo, parameters)
-    save_data(data, problem_name, name)
-    save_parameters(parameters, problem_name, name)
-    save_problem(problem_info, problem_name)
-    print('Experiment Complete')
-
-run_exp(EA, EA_params, 5, problem_name, problem_info)
-
-# algo_name = 'UMDA_g100_p10_s5'
-# data = conduct_runs(n_runs, UMDA, UMDA_params)
-# save_data(data, problem_name, algo_name)
-# save_parameters(EA_params, problem_name, algo_name)
-# save_problem(problem_info, problem_name)
 
 # print('complete')
