@@ -12,6 +12,7 @@ from ProblemScripts import load_problem_KP
 import os
 import pickle
 import json
+from datetime import datetime
 
 from tqdm import trange
 
@@ -72,6 +73,11 @@ def record_population_state(data, population, toolbox, true_fitness_function):
         true_fitnesses.append(true_fitness[0])
     else:
         true_fitnesses.append(best_individual.fitness.values[0])
+
+def timestamp():
+    now = datetime.now()
+    datetime_stamp = now.strftime("%Y-%m-%d %H:%M:%S")
+    return datetime_stamp
 
 # Algorithm functions
 # EA
@@ -361,7 +367,8 @@ def save_problem(problem_info, problem_name):
 
 # Define problem and parameters and conduct runs
 # Problem information
-problem_name = 'rastriginN2A10'
+problem_name = 'TestSpace'
+# problem_name = 'rastriginN2A10'
 # problem_name = 'rastrigin_N10A10'
 n_items = 2
 problem_info = {
@@ -433,17 +440,33 @@ UMDA_params = {
     'true_fitness_function': None, # noise-less fitness function for performance evaluation
 }
 
-# conduct runs
-algo_name = 'EA_g100_p10_e1_t3'
-data = conduct_runs(n_runs, EA, EA_params)
-save_data(data, problem_name, algo_name)
-save_parameters(EA_params, problem_name, algo_name)
-save_problem(problem_info, problem_name)
+def get_exp_name(function, parameters):
+    from datetime import datetime
+    function_name = function.__name__
 
-algo_name = 'UMDA_g100_p10_s5'
-data = conduct_runs(n_runs, UMDA, UMDA_params)
-save_data(data, problem_name, algo_name)
-save_parameters(EA_params, problem_name, algo_name)
-save_problem(problem_info, problem_name)
+    now = datetime.now()
+    timestamp = now.strftime("%Y%m%d%H%M%S")
+    gen = parameters['NGEN']
+    pop = parameters['popsize']
 
-print('complete')
+    exp_name = f"{function_name}_g{gen}_p{pop}_t{timestamp}"
+    return exp_name
+
+
+def run_exp(algo, parameters, n_runs, problem_name, problem_info):
+    name = get_exp_name(algo, parameters)
+    data = conduct_runs(n_runs, algo, parameters)
+    save_data(data, problem_name, name)
+    save_parameters(parameters, problem_name, name)
+    save_problem(problem_info, problem_name)
+    print('Experiment Complete')
+
+run_exp(EA, EA_params, 5, problem_name, problem_info)
+
+# algo_name = 'UMDA_g100_p10_s5'
+# data = conduct_runs(n_runs, UMDA, UMDA_params)
+# save_data(data, problem_name, algo_name)
+# save_parameters(EA_params, problem_name, algo_name)
+# save_problem(problem_info, problem_name)
+
+# print('complete')
