@@ -371,6 +371,7 @@ def update_plot(options, layout_value, hover_info_value, all_trajectories_list, 
             title="3D Trajectory Network Plot",
             width=800,
             height=800,
+            showlegend=False,
             scene=dict(zaxis_title='fitness')
         )
     else:
