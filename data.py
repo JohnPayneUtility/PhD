@@ -442,9 +442,9 @@ fitness_function = (rastrigin_eval, {'amplitude':10})
 
 # Algorithm information
 EA_params = {
-    'NGEN': 100, # Number of generations
-    'popsize': 10, # Population size
-    'tournsize': 3, # Tournament selection size
+    'NGEN': 1000, # Number of generations
+    'popsize': 100, # Population size
+    'tournsize': 30, # Tournament selection size
     'len_sol': n_items, # solution length
     'weights': (-1.0,),
     'attr_function': attr_function,
@@ -452,12 +452,12 @@ EA_params = {
     'fitness_function': fitness_function, # algorithm objective function
     'starting_solution': None, # Specified starting solution for all individuals
     'true_fitness_function': None, # noise-less fitness function for performance evaluation
-    'n_elite': 1
+    'n_elite': 10
 }
 UMDA_params = {
-    'NGEN': 100, # Number of generations
-    'popsize': 10, # Population size
-    'selectsize': 5, # Size selected for distribution
+    'NGEN': 1000, # Number of generations
+    'popsize': 100, # Population size
+    'selectsize': 50, # Size selected for distribution
     'len_sol': n_items, # solution length
     'weights': (-1.0,),
     'attr_function': attr_function,
@@ -467,7 +467,7 @@ UMDA_params = {
     'true_fitness_function': None, # noise-less fitness function for performance evaluation
 }
 
-n_runs = 5
+n_runs = 10
 run_exp(EA, EA_params, n_runs, problem_name, problem_info)
 run_exp(UMDA, UMDA_params, n_runs, problem_name, problem_info)
 

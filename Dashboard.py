@@ -87,10 +87,10 @@ app.layout = html.Div([
     ),
     dcc.Graph(id='trajectory-plot'),
     html.P(
-        id='display-algo-info',
+        id='display-algo-info', children='',
         style={'fontSize': 16, 'marginTop': '10px'}
     ),
-    html.Div(id='unique-solutions-display', style={'marginTop': '20px'})
+    html.P(id='unique-solutions-display', children='', style={'marginTop': '20px'})
 ])
 
 # File selection
@@ -125,7 +125,7 @@ def update_file_dropdown(selected_folder):
 )
 def load_data(selected_folder, selected_files):
     if not selected_folder or not selected_files:
-        return None, "No Algorithm selected"
+        return None, "No Algorithm selected", "No Algorithm selected"
 
     # Load the selected data files
     all_trajectories_list = []
