@@ -442,7 +442,7 @@ fitness_function = (rastrigin_eval, {'amplitude':10})
 
 # Algorithm information
 EA_params = {
-    'NGEN': 1000, # Number of generations
+    'NGEN': 100, # Number of generations
     'popsize': 100, # Population size
     'tournsize': 30, # Tournament selection size
     'len_sol': n_items, # solution length
@@ -467,9 +467,9 @@ UMDA_params = {
     'true_fitness_function': None, # noise-less fitness function for performance evaluation
 }
 
-n_runs = 10
+n_runs = 100
 run_exp(EA, EA_params, n_runs, problem_name, problem_info)
-run_exp(UMDA, UMDA_params, n_runs, problem_name, problem_info)
+# run_exp(UMDA, UMDA_params, n_runs, problem_name, problem_info)
 
 
 

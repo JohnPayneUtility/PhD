@@ -37,6 +37,12 @@ app.layout = html.Div([
         id='display-problem-info',
         style={'fontSize': 16, 'marginTop': '10px'}
     ),
+    html.Label("Select optima data:"),
+    dcc.Dropdown(
+        id='optima-file-dropdown',
+        multi=False
+    ),
+    dcc.Store(id='local-optima'),
     html.Label("Select algorithm data:"),
     dcc.Dropdown(
         id='file-dropdown',
@@ -102,7 +108,7 @@ app.layout = html.Div([
 def update_file_dropdown(selected_folder):
     if selected_folder:
         folder_path = os.path.join(data_folder, selected_folder)
-        file_options = [{'label': file, 'value': file} for file in os.listdir(folder_path) if file.endswith('.pkl')]
+        file_options = [{'label': file, 'value': file} for file in os.listdir(folder_path) if file.endswith('.pkl') and not file.endswith('LO.pkl')]
         
         # Try to read 'info.txt' if it exists in the folder
         info_file_path = os.path.join(folder_path, 'info.txt')
@@ -114,6 +120,32 @@ def update_file_dropdown(selected_folder):
 
         return file_options, info_content
     return [], "No problem selected"
+
+@app.callback(
+    Output('optima-file-dropdown', 'options'),
+    Input('folder-dropdown', 'value')
+)
+def update_optima_file_dropdown(selected_folder):
+    if selected_folder:
+        folder_path = os.path.join(data_folder, selected_folder)
+        file_options = [{'label': file, 'value': file} for file in os.listdir(folder_path) if file.endswith('LO.pkl')]
+        return file_options
+    return []
+
+@app.callback(
+    Output('local-optima', 'data'),
+    [Input('folder-dropdown', 'value'),
+     Input('optima-file-dropdown', 'value')]
+)
+def load_optima_data(selected_folder, selected_file):
+    if not selected_folder or not selected_file:
+        return None
+    
+    file_path = os.path.join(data_folder, selected_folder, selected_file)
+    with open(file_path, 'rb') as f:
+        local_optima = pickle.load(f)
+
+    return local_optima
 
 # Data loading
 @app.callback(
@@ -160,9 +192,10 @@ def load_data(selected_folder, selected_files):
      Input('layout', 'value'),
      Input('hover-info', 'value'),
      Input('loaded-data-store', 'data'),
-     Input('n-runs-slider', 'value')]
+     Input('n-runs-slider', 'value'),
+     Input('local-optima', 'data')]
 )
-def update_plot(options, layout_value, hover_info_value, all_trajectories_list, n_runs_display):
+def update_plot(options, layout_value, hover_info_value, all_trajectories_list, n_runs_display, local_optima):
     if not all_trajectories_list:
         return go.Figure()
     
@@ -180,6 +213,7 @@ def update_plot(options, layout_value, hover_info_value, all_trajectories_list, 
     # Colors for different sets of trajectories
     edge_colors = ['blue', 'orange', 'purple', 'brown', 'cyan', 'magenta']
     node_color_shared = 'green'
+    local_optima_color = 'black'
 
     # Add nodes and edges for each set of trajectories
     node_mapping = {}  # To ensure unique solutions map to the same node
@@ -232,6 +266,16 @@ def update_plot(options, layout_value, hover_info_value, all_trajectories_list, 
         edge_color = edge_colors[idx % len(edge_colors)]  # Cycle through colors if there are more sets than colors
         selected_trajectories = select_top_runs_by_fitness(all_run_trajectories, n_runs_display)
         add_trajectories_to_graph(selected_trajectories, edge_color)
+    
+    # Add local optima nodes if provided
+    if local_optima:
+        local_optima_solutions, local_optima_fitnesses = local_optima
+        for i, (solution, fitness) in enumerate(zip(local_optima_solutions, local_optima_fitnesses)):
+            solution_tuple = tuple(solution)
+            if solution_tuple not in node_mapping:
+                node_label = f"Local Optimum {len(node_mapping) + 1}"
+                node_mapping[solution_tuple] = node_label
+                G.add_node(node_label, solution=solution, fitness=fitness)
 
     # Find the overall best solution across all sets of trajectories
     overall_best_fitness = max(
@@ -251,6 +295,8 @@ def update_plot(options, layout_value, hover_info_value, all_trajectories_list, 
             node_colors.append('yellow')
         elif node in end_nodes:
             node_colors.append('grey')
+        elif "Local Optimum" in node:
+            node_colors.append(local_optima_color)
         else:
             # Check if the node exists in multiple sets of trajectories
             solution_tuple = next(key for key, value in node_mapping.items() if value == node)
