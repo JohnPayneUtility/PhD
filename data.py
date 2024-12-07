@@ -417,37 +417,38 @@ def run_exp(algo, parameters, n_runs, problem_name, problem_info, suffix=''):
 # Define problem and parameters and conduct runs
 # Problem information
 # problem_name = 'TestSpace'
-# problem_name = 'rastriginN2A10'
+problem_name = 'rastriginN2A10'
 # problem_name = 'rastrigin_N10A10'
 
-n_items = 100
-problem_name = f'OneMax_{n_items}_noise'
+n_items = 2
+# problem_name = f'OneMax_{n_items}_noise'
 problem_info = {
     'number of items': n_items,
 }
 
-# attr_function = (random.uniform, -5.12, 5.12) # attribute function for rastrigin
-attr_function = (random.randint, 0, 1) # binary attribute function
+attr_function = (random.uniform, -5.12, 5.12) # attribute function for rastrigin
+# attr_function = (random.randint, 0, 1) # binary attribute function
 
 # mutate_function = (tools.mutGaussian, {'mu': 0, 'sigma': 0.1, 'indpb': 0.05})
-mutate_function = (tools.mutFlipBit, {'indpb': 0.05})
+mutate_function = (tools.mutGaussian, {'mu': 0, 'sigma': 0.05, 'indpb': 1})
+# mutate_function = (tools.mutFlipBit, {'indpb': 0.05})
 
-fitness_function = (OneMax_fitness, {'noise_function': random_bit_flip, 'noise_intensity': 50})
-# fitness_function = (rastrigin_eval, {'amplitude':10})
-fitness_function_true = (OneMax_fitness, {})
+# fitness_function = (OneMax_fitness, {'noise_function': random_bit_flip, 'noise_intensity': 50})
+fitness_function = (rastrigin_eval, {'amplitude':10})
+# fitness_function_true = (OneMax_fitness, {})
 
 # # Algorithm information
 EA_params = {
-    'NGEN': 250, # Number of generations
+    'NGEN': 1000, # Number of generations
     'popsize': 100, # Population size
-    'tournsize': 30, # Tournament selection size
+    'tournsize': 10, # Tournament selection size
     'len_sol': n_items, # solution length
-    'weights': (1.0,),
+    'weights': (-1.0,),
     'attr_function': attr_function,
     'mutate_function': mutate_function,
     'fitness_function': fitness_function, # algorithm objective function
-    'starting_solution': generate_zero_solution(n_items), # Specified starting solution for all individuals
-    'true_fitness_function': fitness_function_true, # noise-less fitness function for performance evaluation
+    'starting_solution': None, # Specified starting solution for all individuals
+    'true_fitness_function': None, # noise-less fitness function for performance evaluation
     'n_elite': 10
 }
 UMDA_params = {
@@ -455,17 +456,17 @@ UMDA_params = {
     'popsize': 100, # Population size
     'selectsize': 50, # Size selected for distribution
     'len_sol': n_items, # solution length
-    'weights': (1.0,),
+    'weights': (-1.0,),
     'attr_function': attr_function,
     'mutate_function': None,
     'fitness_function': fitness_function, # algorithm objective function
     'starting_solution': None, # Specified starting solution for all individuals
-    'true_fitness_function': fitness_function_true, # noise-less fitness function for performance evaluation
+    'true_fitness_function': None, # noise-less fitness function for performance evaluation
 }
 
 n_runs = 10
-# run_exp(EA, EA_params, n_runs, problem_name, problem_info, suffix='bfn30')
-run_exp(UMDA, UMDA_params, n_runs, problem_name, problem_info, suffix='bfn50')
+run_exp(EA, EA_params, n_runs, problem_name, problem_info, suffix='')
+# run_exp(UMDA, UMDA_params, n_runs, problem_name, problem_info, suffix='')
 
 
 
