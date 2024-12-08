@@ -101,6 +101,78 @@ def timestamp():
     return datetime_stamp
 
 # Algorithm functions
+# 1+1 HC
+def HC(NGEN, tournsize, len_sol, weights, attr_function=None, mutate_function=None, fitness_function=None, starting_solution=None, true_fitness_function=None):
+    # Set population size to 1 for 1+1 hill climbing
+    popsize = 1
+
+    # Check if the fitness and individual creators have been defined; if not, define them
+    if not hasattr(creator, "CustomFitness"):
+        creator.create("CustomFitness", base.Fitness, weights=weights)
+    if not hasattr(creator, "Individual"):
+        creator.create("Individual", list, fitness=creator.CustomFitness)
+
+    # Define the toolbox used for the evolutionary algorithm
+    toolbox = base.Toolbox()
+
+    # Register attribute generation using parameters provided
+    if attr_function is None:
+        raise ValueError("Attribute generation function must be provided (e.g., random.uniform, -5.12, 5.12 or random.randint, 0, 1)")
+    toolbox.register("attribute", *attr_function)
+
+    # Register individual
+    toolbox.register("individual", tools.initRepeat, creator.Individual, toolbox.attribute, n=len_sol)
+    # Register population
+    toolbox.register("population", tools.initRepeat, list, toolbox.individual)
+    
+    # Register the evaluation function, allowing additional parameters to be passed
+    toolbox.register("evaluate", lambda ind: fitness_function[0](ind, **fitness_function[1]))
+
+    # Register mutation function using parameters provided
+    if mutate_function is None:
+        raise ValueError("Mutation function must be provided (e.g., tools.mutGaussian, mu=0, sigma=1.0, indpb=indpb or tools.mutFlipBit, indpb=indpb)")
+    toolbox.register("mutate", lambda ind: mutate_function[0](ind, **mutate_function[1]))
+
+    # Create an initial population of individuals
+    population = toolbox.population(n=popsize)
+
+    # If a starting solution is provided, set all individuals to that solution
+    if starting_solution is not None:
+        for ind in population:
+            ind[:] = starting_solution[:]
+
+    # Evaluate the initial population
+    fitnesses = list(map(toolbox.evaluate, population))
+    for ind, fit in zip(population, fitnesses):
+        ind.fitness.values = fit
+
+    # Initialise data recording
+    all_generations, best_solutions, best_fitnesses, true_fitnesses = ([] for _ in range(4))
+    data = [all_generations, best_solutions, best_fitnesses, true_fitnesses]
+
+    # Record initial population
+    record_population_state(data, population, toolbox, true_fitness_function)
+
+    # Evolutionary loop for each generation
+    for gen in trange(NGEN, desc='Evolving EA Solutions'):
+        # Generate a single mutant from the current solution
+        mutant = toolbox.clone(population[0])
+        toolbox.mutate(mutant)  # Mutate the individual
+        del mutant.fitness.values  # Delete fitness to mark it as needing reevaluation
+
+        # Evaluate the mutant
+        mutant.fitness.values = toolbox.evaluate(mutant)
+
+        # Replace the current solution with the mutant if it is better
+        if tools.selBest([population[0], mutant], 1)[0] is mutant:
+            population[0] = mutant
+
+        # Record current population
+        record_population_state(data, population, toolbox, true_fitness_function)
+
+    return all_generations, best_solutions, best_fitnesses, true_fitnesses
+
+
 # EA
 def EA(NGEN, popsize, tournsize, len_sol, weights, attr_function=None, mutate_function=None, fitness_function=None, starting_solution=None, true_fitness_function=None, n_elite=1):
     # Check if the fitness and individual creators have been defined; if not, define them
@@ -400,7 +472,9 @@ def get_exp_name(function, parameters, suffix=''):
     now = datetime.now()
     timestamp = now.strftime("%Y%m%d%H%M%S")
     gen = parameters['NGEN']
-    pop = parameters['popsize']
+    if 'popsize' in parameters:
+        pop = parameters['popsize']
+    else: pop = 'NA'
 
     exp_name = f"{function_name}{suffix}_g{gen}_p{pop}_{timestamp}"
     return exp_name
@@ -439,8 +513,8 @@ fitness_function = (rastrigin_eval, {'amplitude':10})
 
 # # Algorithm information
 EA_params = {
-    'NGEN': 1000, # Number of generations
-    'popsize': 100, # Population size
+    'NGEN': 10000, # Number of generations
+    # 'popsize': 100, # Population size
     'tournsize': 10, # Tournament selection size
     'len_sol': n_items, # solution length
     'weights': (-1.0,),
@@ -449,7 +523,7 @@ EA_params = {
     'fitness_function': fitness_function, # algorithm objective function
     'starting_solution': None, # Specified starting solution for all individuals
     'true_fitness_function': None, # noise-less fitness function for performance evaluation
-    'n_elite': 10
+    # 'n_elite': 10
 }
 UMDA_params = {
     'NGEN': 100, # Number of generations
@@ -465,7 +539,7 @@ UMDA_params = {
 }
 
 n_runs = 10
-run_exp(EA, EA_params, n_runs, problem_name, problem_info, suffix='')
+run_exp(HC, EA_params, n_runs, problem_name, problem_info, suffix='')
 # run_exp(UMDA, UMDA_params, n_runs, problem_name, problem_info, suffix='')
 
 
