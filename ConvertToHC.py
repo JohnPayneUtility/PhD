@@ -16,8 +16,13 @@ def get_local_optima(folder, filename):
     final_unique_solutions_no_duplicates = [pair[0] for pair in unique_pairs.values()]
     final_unique_fitnesses_no_duplicates = [pair[1] for pair in unique_pairs.values()]
 
-    Local_optima = [final_unique_solutions_no_duplicates, final_unique_fitnesses_no_duplicates]
+    # Print max and min fitness info
+    max_fitness = max(final_unique_fitnesses_no_duplicates)
+    min_fitness = min(final_unique_fitnesses_no_duplicates)
+    print(f"Maximum fitness: {max_fitness}")
+    print(f"Minimum fitness: {min_fitness}")
 
+    Local_optima = [final_unique_solutions_no_duplicates, final_unique_fitnesses_no_duplicates]
     save_filename = f'{filename}_LO.pkl'
     save_path = os.path.join(folder, save_filename)
 
