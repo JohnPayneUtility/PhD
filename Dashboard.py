@@ -13,6 +13,14 @@ import pickle
 data_folder = 'data'
 folder_options = [{'label': folder, 'value': folder} for folder in os.listdir(data_folder) if os.path.isdir(os.path.join(data_folder, folder))]
 
+def determine_optimisation_goal(all_trajectories_list):
+        first_run = all_trajectories_list[0][0]  # Access the first trajectory
+        starting_fitness = first_run[1][0]  # Initial fitness value
+        ending_fitness = first_run[1][-1]  # Final fitness value
+        print(starting_fitness)
+        print(ending_fitness)
+        return "min" if ending_fitness < starting_fitness else "max"
+
 # Create Dash app
 app = dash.Dash(__name__)
 app.layout = html.Div([
@@ -221,15 +229,23 @@ def update_plot(options, layout_value, hover_info_value, all_trajectories_list, 
     end_nodes = set()
     overall_best_node = None
 
+    optimisation_goal = determine_optimisation_goal(all_trajectories_list)
+
     # Function to calculate Hamming distance
     def hamming_distance(sol1, sol2):
         return sum(el1 != el2 for el1, el2 in zip(sol1, sol2))
     
-    def select_top_runs_by_fitness(all_run_trajectories, n_runs_display):
-        # Sort runs by the best (highest) final fitness, in descending order
-        sorted_runs = sorted(all_run_trajectories, 
-                            key=lambda run: run[1][-1],  # Access the last fitness value in the unique_fitnesses list
-                            reverse=True)
+    def select_top_runs_by_fitness(all_run_trajectories, n_runs_display, optimisation_goal):
+        if optimisation_goal == 'max':
+            # Sort runs by the best (highest) final fitness, in descending order
+            sorted_runs = sorted(all_run_trajectories, 
+                                key=lambda run: run[1][-1],  # Access the last fitness value in the unique_fitnesses list
+                                reverse=True)
+        else:
+            # Sort runs by the best (lowest) final fitness, in ascending order
+            sorted_runs = sorted(all_run_trajectories, 
+                                key=lambda run: run[1][-1],  # Access the last fitness value in the unique_fitnesses list
+                                reverse=False)
         
         # Cap the number of runs to display
         top_runs = sorted_runs[:n_runs_display]
@@ -264,7 +280,7 @@ def update_plot(options, layout_value, hover_info_value, all_trajectories_list, 
     # Add all sets of trajectories to the graph
     for idx, all_run_trajectories in enumerate(all_trajectories_list):
         edge_color = edge_colors[idx % len(edge_colors)]  # Cycle through colors if there are more sets than colors
-        selected_trajectories = select_top_runs_by_fitness(all_run_trajectories, n_runs_display)
+        selected_trajectories = select_top_runs_by_fitness(all_run_trajectories, n_runs_display, optimisation_goal)
         add_trajectories_to_graph(selected_trajectories, edge_color)
     
     # Add local optima nodes if provided
@@ -278,16 +294,27 @@ def update_plot(options, layout_value, hover_info_value, all_trajectories_list, 
                 G.add_node(node_label, solution=solution, fitness=fitness)
 
     # Find the overall best solution across all sets of trajectories
-    overall_best_fitness = max(
-        max(best_fitnesses) for all_run_trajectories in all_trajectories_list for _, best_fitnesses, _, _ in all_run_trajectories
-    )
-    # FIne overall best solution from local optima
+    if optimisation_goal == "max":
+        overall_best_fitness = max(
+            max(best_fitnesses) for all_run_trajectories in all_trajectories_list for _, best_fitnesses, _, _ in all_run_trajectories
+        )
+    else:  # Minimisation
+        overall_best_fitness = min(
+            min(best_fitnesses) for all_run_trajectories in all_trajectories_list for _, best_fitnesses, _, _ in all_run_trajectories
+        )
+
+    # Find overall best solution from local optima
     if local_optima:
         local_optima_solutions, local_optima_fitnesses = local_optima
-        local_optima_best_fitness = max(local_optima_fitnesses)
-        if local_optima_best_fitness > overall_best_fitness:
-            overall_best_fitness = local_optima_best_fitness
-    
+        if optimisation_goal == "max":
+            local_optima_best_fitness = max(local_optima_fitnesses)
+            if local_optima_best_fitness > overall_best_fitness:
+                overall_best_fitness = local_optima_best_fitness
+        else:  # Minimization
+            local_optima_best_fitness = min(local_optima_fitnesses)
+            if local_optima_best_fitness < overall_best_fitness:
+                overall_best_fitness = local_optima_best_fitness
+
     # Find the overall best node
     for node, data in G.nodes(data=True):
         if data['fitness'] == overall_best_fitness:
@@ -318,7 +345,7 @@ def update_plot(options, layout_value, hover_info_value, all_trajectories_list, 
                 node_colors.append(node_color_shared)
             else:
                 node_colors.append('skyblue')
-    print(f"Node Colors: {node_colors}")
+    # print(f"Node Colors: {node_colors}")
 
     # Calculate node sizes
     if hide_nodes:
