@@ -99,6 +99,28 @@ app.layout = html.Div([
         placeholder='Select hover information',
         style={'width': '50%', 'marginTop': '10px'}
     ),
+    html.Div([
+        html.Label("X-axis range"),
+        dcc.Slider(
+            id='x-axis-slider',
+            min=1,
+            max=10,
+            step=0.1,
+            value=5,  # Default range
+            marks={i: f"{i}" for i in range(1, 11)}
+        )
+    ], style={'width': '50%', 'margin': 'auto'}),
+    html.Div([
+        html.Label("Y-axis range"),
+        dcc.Slider(
+            id='y-axis-slider',
+            min=1,
+            max=10,
+            step=0.1,
+            value=5,  # Default range
+            marks={i: f"{i}" for i in range(1, 11)}
+        )
+    ], style={'width': '50%', 'margin': 'auto'}),
     dcc.Graph(id='trajectory-plot'),
     html.P(
         id='display-algo-info', children='',
@@ -201,9 +223,11 @@ def load_data(selected_folder, selected_files):
      Input('hover-info', 'value'),
      Input('loaded-data-store', 'data'),
      Input('run-selector', 'value'),
-     Input('local-optima', 'data')]
+     Input('local-optima', 'data'),
+     Input('x-axis-slider', 'value'),
+    Input('y-axis-slider', 'value')]
 )
-def update_plot(options, layout_value, hover_info_value, all_trajectories_list, n_runs_display, local_optima):
+def update_plot(options, layout_value, hover_info_value, all_trajectories_list, n_runs_display, local_optima, x_slider, y_slider):
     if not all_trajectories_list:
         return go.Figure()
     
@@ -418,6 +442,10 @@ def update_plot(options, layout_value, hover_info_value, all_trajectories_list, 
         )
         edge_trace.append(trace)
 
+    # Set x and y axis ranges based on slider
+    x_range = [-x_slider, x_slider]
+    y_range = [-y_slider, y_slider]
+
     if plot_3D:
         # 3D Plotting logic
         fig = go.Figure()
@@ -455,7 +483,11 @@ def update_plot(options, layout_value, hover_info_value, all_trajectories_list, 
             width=800,
             height=800,
             showlegend=False,
-            scene=dict(zaxis_title='fitness')
+            scene=dict(
+                xaxis=dict(range=x_range),
+                yaxis=dict(range=y_range),
+                zaxis=dict(title='fitness')
+            )
         )
     else:
         node_trace = go.Scatter(
