@@ -491,7 +491,7 @@ attr_function = (random.uniform, -5.12, 5.12) # attribute function for rastrigin
 # attr_function = (random.randint, 0, 1) # binary attribute function
 
 # mutate_function = (tools.mutGaussian, {'mu': 0, 'sigma': 0.1, 'indpb': 0.05})
-mutate_function = (tools.mutGaussian, {'mu': 0, 'sigma': 0.2, 'indpb': 0.5})
+mutate_function = (tools.mutGaussian, {'mu': 0, 'sigma': 0.1, 'indpb': 0.5})
 # mutate_function = (tools.mutFlipBit, {'indpb': 0.05})
 
 # fitness_function = (OneMax_fitness, {'noise_function': random_bit_flip, 'noise_intensity': 50})
@@ -499,7 +499,7 @@ fitness_function = (rastrigin_eval, {'amplitude':10})
 # fitness_function_true = (OneMax_fitness, {})
 
 # # Algorithm information
-EA_params = {
+HC_params = {
     'NGEN': 10000, # Number of generations
     # 'popsize': 100, # Population size
     'tournsize': 10, # Tournament selection size
@@ -511,6 +511,19 @@ EA_params = {
     'starting_solution': None, # Specified starting solution for all individuals
     'true_fitness_function': None, # noise-less fitness function for performance evaluation
     # 'n_elite': 10
+}
+EA_params = {
+    'NGEN': 1000, # Number of generations
+    'popsize': 100, # Population size
+    'tournsize': 10, # Tournament selection size
+    'len_sol': n_items, # solution length
+    'weights': (-1.0,),
+    'attr_function': attr_function,
+    'mutate_function': mutate_function,
+    'fitness_function': fitness_function, # algorithm objective function
+    'starting_solution': None, # Specified starting solution for all individuals
+    'true_fitness_function': None, # noise-less fitness function for performance evaluation
+    'n_elite': 10
 }
 UMDA_params = {
     'NGEN': 100, # Number of generations
@@ -525,10 +538,15 @@ UMDA_params = {
     'true_fitness_function': None, # noise-less fitness function for performance evaluation
 }
 
-n_runs = 200
-run_exp(HC, EA_params, n_runs, problem_name, problem_info, suffix='')
+n_runs = 10
+# run_exp(HC, HC_params, n_runs, problem_name, problem_info, suffix='')
 # run_exp(UMDA, UMDA_params, n_runs, problem_name, problem_info, suffix='')
-
+EA_params['tournsize'] = 20
+run_exp(EA, EA_params, n_runs, problem_name, problem_info, suffix='')
+EA_params['tournsize'] = 30
+run_exp(EA, EA_params, n_runs, problem_name, problem_info, suffix='')
+EA_params['tournsize'] = 50
+run_exp(EA, EA_params, n_runs, problem_name, problem_info, suffix='')
 
 
 # print('complete')

@@ -50,4 +50,4 @@ def get_local_optima(folder, filename, maximisation=True, filtering='same', simi
     print(f"Local optima saved to {save_path}")
 
 # get_local_optima('data/rastriginN2A10', 'HC_g10000_pNA_20241209021744')
-get_local_optima('data/rastriginN2A10', 'HC_g10000_pNA_20241209124518', maximisation=False, filtering='similar')
+get_local_optima('data/rastriginN2A10', 'HC_g10000_pNA_20241209134700', maximisation=False, filtering='similar')
