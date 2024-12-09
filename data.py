@@ -401,6 +401,21 @@ def conduct_runs(num_runs, algorithm_function, param_dict):
     
     return all_run_trajectories
 
+def serialize_functions(parameters):
+    """
+    Convert any functions or non-serializable objects in a dictionary to strings.
+    """
+    def convert_value(value):
+        if callable(value):  # Check if it's a function or callable object
+            return value.__name__
+        elif isinstance(value, tuple):  # Handle tuples that may contain functions
+            return tuple(convert_value(v) for v in value)
+        elif isinstance(value, dict):  # Handle nested dictionaries
+            return {k: convert_value(v) for k, v in value.items()}
+        return value  # Leave serializable objects unchanged
+
+    return {key: convert_value(value) for key, value in parameters.items()}
+
 def save_data(data, problem_name, algo_name):
     folder_path = 'data/' +  problem_name
     file_name = algo_name + '.pkl'
@@ -418,7 +433,9 @@ def save_data(data, problem_name, algo_name):
 
 def save_parameters(parameters, problem_name, algo_name):
     folder_path = 'data/' +  problem_name
-    file_name = algo_name + '.txt'
+    file_name = algo_name + '.json'
+
+    serializable_params = serialize_functions(parameters)
 
     # Create the folder if it does not exist
     if not os.path.exists(folder_path):
@@ -429,7 +446,7 @@ def save_parameters(parameters, problem_name, algo_name):
 
     # Write file
     with open(file_path, 'w') as file:
-        json.dump(str(parameters), file)
+        json.dump(serializable_params, file, indent=4)
     
 def save_problem(problem_info, problem_name):
     folder_path = 'data/' +  problem_name
@@ -541,12 +558,13 @@ UMDA_params = {
 n_runs = 10
 # run_exp(HC, HC_params, n_runs, problem_name, problem_info, suffix='')
 # run_exp(UMDA, UMDA_params, n_runs, problem_name, problem_info, suffix='')
+run_exp(EA, EA_params, n_runs, problem_name, problem_info, suffix='')
 EA_params['tournsize'] = 20
-run_exp(EA, EA_params, n_runs, problem_name, problem_info, suffix='')
+# run_exp(EA, EA_params, n_runs, problem_name, problem_info, suffix='')
 EA_params['tournsize'] = 30
-run_exp(EA, EA_params, n_runs, problem_name, problem_info, suffix='')
+# run_exp(EA, EA_params, n_runs, problem_name, problem_info, suffix='')
 EA_params['tournsize'] = 50
-run_exp(EA, EA_params, n_runs, problem_name, problem_info, suffix='')
+# run_exp(EA, EA_params, n_runs, problem_name, problem_info, suffix='')
 
 
 # print('complete')

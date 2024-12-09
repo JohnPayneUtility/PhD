@@ -8,6 +8,7 @@ from sklearn.manifold import TSNE
 
 import os
 import pickle
+import json
 
 # Get list of folders in the data directory
 data_folder = 'data'
@@ -20,6 +21,8 @@ def determine_optimisation_goal(all_trajectories_list):
         print(starting_fitness)
         print(ending_fitness)
         return "min" if ending_fitness < starting_fitness else "max"
+
+algo_colors = ['blue', 'orange', 'purple', 'brown', 'cyan', 'magenta']
 
 # Create Dash app
 app = dash.Dash(__name__)
@@ -122,10 +125,8 @@ app.layout = html.Div([
         )
     ], style={'width': '50%', 'margin': 'auto'}),
     dcc.Graph(id='trajectory-plot'),
-    html.P(
-        id='display-algo-info', children='',
-        style={'fontSize': 16, 'marginTop': '10px'}
-    ),
+    dcc.Store(id='algo-info'),
+    html.Div(id='display-algo-info', style={'marginTop': '10px'}),
     html.P(id='unique-solutions-display', children='', style={'marginTop': '20px'})
 ])
 
@@ -180,40 +181,75 @@ def load_optima_data(selected_folder, selected_file):
 # Data loading
 @app.callback(
     [Output('loaded-data-store', 'data'),
-     Output('display-algo-info', 'children'),
+     Output('algo-info', 'data'),
      Output('unique-solutions-display', 'children')],
     [Input('folder-dropdown', 'value'),
      Input('file-dropdown', 'value')]
 )
 def load_data(selected_folder, selected_files):
     if not selected_folder or not selected_files:
-        return None, "No Algorithm selected", "No Algorithm selected"
+        return None, [], []
 
-    # Load the selected data files
     all_trajectories_list = []
     all_info_files_list = []
 
     for file_name in selected_files:
+        # Load trajectory data (pickle file)
         file_path = os.path.join(data_folder, selected_folder, file_name)
         with open(file_path, 'rb') as f:
             all_trajectories_list.append(pickle.load(f))
         
-        info_filename = file_name.replace('pkl', 'txt')
+        # Load JSON parameter file
+        info_filename = file_name.replace('pkl', 'json') # replacer pkl with json for parameter file of same name
         info_file_path = os.path.join(data_folder, selected_folder, info_filename)
         if os.path.exists(info_file_path):
             with open(info_file_path, 'r') as info_file:
-                # info_content = info_file.read()
-                all_info_files_list.append(info_file.read())
+                all_info_files_list.append(json.load(info_file))
         else:
-            all_info_files_list.append("Algo info not available")
+            all_info_files_list.append({"error": "Algo info not available"})
 
-    unique_solutions_text = ""
-    for idx, all_run_trajectories in enumerate(all_trajectories_list):
-        if all_run_trajectories:
-            first_run_unique_solutions = all_run_trajectories[0][1]  # Unique solutions from the first run
-            unique_solutions_text += f"Algorithm {idx + 1} - First Run Unique Solutions:\n{first_run_unique_solutions}\n\n"
+    # Generate unique solutions text
+    unique_solutions_text = [
+        (f"Algorithm {idx + 1} - First Run Unique Solutions:\n{trajectories[0][1]}\n\n", idx)
+        for idx, trajectories in enumerate(all_trajectories_list) if trajectories
+    ]
 
-    return all_trajectories_list, "\n".join(all_info_files_list), unique_solutions_text
+    return all_trajectories_list, all_info_files_list, unique_solutions_text
+
+@app.callback(
+    Output('display-algo-info', 'children'),
+    Input('algo-info', 'data')
+)
+def update_algo_info(all_info_files_list):
+    def format_algo_info(info, color):
+        # Format the dictionary as a list of key-value pairs
+        formatted_info = [
+            html.Div(
+                children=[
+                    html.Span(f"{key}: ", style={'fontWeight': 'bold'}),
+                    html.Span(str(value))
+                ]
+            )
+            for key, value in info.items()
+        ]
+        return html.Div(
+            children=formatted_info,
+            style={'color': color, 'fontSize': '14px', 'marginBottom': '10px'}
+        )
+
+    # Loop through each dictionary and format it
+    info_divs = [
+        html.Div(
+            children=[
+                html.Span(f"Algorithm {i + 1} Info:", style={'fontWeight': 'bold', 'color': algo_colors[i]}),
+                format_algo_info(info, algo_colors[i])
+            ],
+            style={'marginBottom': '10px'}
+        )
+        for i, info in enumerate(all_info_files_list)
+    ]
+
+    return info_divs
 
 # Plotting
 @app.callback(
@@ -243,7 +279,7 @@ def update_plot(options, layout_value, hover_info_value, all_trajectories_list, 
     G = nx.DiGraph()
 
     # Colors for different sets of trajectories
-    edge_colors = ['blue', 'orange', 'purple', 'brown', 'cyan', 'magenta']
+    # algo_colors = ['blue', 'orange', 'purple', 'brown', 'cyan', 'magenta']
     node_color_shared = 'green'
     local_optima_color = 'black'
 
@@ -303,7 +339,7 @@ def update_plot(options, layout_value, hover_info_value, all_trajectories_list, 
 
     # Add all sets of trajectories to the graph
     for idx, all_run_trajectories in enumerate(all_trajectories_list):
-        edge_color = edge_colors[idx % len(edge_colors)]  # Cycle through colors if there are more sets than colors
+        edge_color = algo_colors[idx % len(algo_colors)]  # Cycle through colors if there are more sets than colors
         selected_trajectories = select_top_runs_by_fitness(all_run_trajectories, n_runs_display, optimisation_goal)
         add_trajectories_to_graph(selected_trajectories, edge_color)
     
