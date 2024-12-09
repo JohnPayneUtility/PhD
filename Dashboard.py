@@ -281,9 +281,18 @@ def update_plot(options, layout_value, hover_info_value, all_trajectories_list, 
     overall_best_fitness = max(
         max(best_fitnesses) for all_run_trajectories in all_trajectories_list for _, best_fitnesses, _, _ in all_run_trajectories
     )
+    # FIne overall best solution from local optima
+    if local_optima:
+        local_optima_solutions, local_optima_fitnesses = local_optima
+        local_optima_best_fitness = max(local_optima_fitnesses)
+        if local_optima_best_fitness > overall_best_fitness:
+            overall_best_fitness = local_optima_best_fitness
+    
+    # Find the overall best node
     for node, data in G.nodes(data=True):
         if data['fitness'] == overall_best_fitness:
             overall_best_node = node
+            print(overall_best_node)
             break
 
     # Prepare node colors
@@ -309,6 +318,7 @@ def update_plot(options, layout_value, hover_info_value, all_trajectories_list, 
                 node_colors.append(node_color_shared)
             else:
                 node_colors.append('skyblue')
+    print(f"Node Colors: {node_colors}")
 
     # Calculate node sizes
     if hide_nodes:

@@ -491,7 +491,7 @@ attr_function = (random.uniform, -5.12, 5.12) # attribute function for rastrigin
 # attr_function = (random.randint, 0, 1) # binary attribute function
 
 # mutate_function = (tools.mutGaussian, {'mu': 0, 'sigma': 0.1, 'indpb': 0.05})
-mutate_function = (tools.mutGaussian, {'mu': 0, 'sigma': 0.1, 'indpb': 0.5})
+mutate_function = (tools.mutGaussian, {'mu': 0, 'sigma': 0.2, 'indpb': 0.5})
 # mutate_function = (tools.mutFlipBit, {'indpb': 0.05})
 
 # fitness_function = (OneMax_fitness, {'noise_function': random_bit_flip, 'noise_intensity': 50})
