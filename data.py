@@ -247,19 +247,6 @@ def EA(NGEN, popsize, tournsize, len_sol, weights, attr_function=None, mutate_fu
         fitnesses = map(toolbox.evaluate, invalid_ind)
         for ind, fit in zip(invalid_ind, fitnesses):
             ind.fitness.values = fit
-        
-        # print(f"Offspring Fitness: {[ind.fitness.values[0] for ind in offspring]}")
-
-        # # Select the best individuals from the current population to keep (elitism)
-        # elites = tools.selBest(population, n_elite)
-
-        # # Replace the weakest individuals in the population with the offspring
-        # for mutant in offspring:
-        #     weakest_idx = min(range(len(population)), key=lambda idx: population[idx].fitness.values)  # Find the weakest individual
-        #     population[weakest_idx] = mutant  # Replace it with the mutated individual
-
-        # Add the elite individuals back to the population
-        # population.extend(elites)
 
         # Create the new population by combining elites and offspring
         population = elites + offspring
@@ -504,7 +491,7 @@ attr_function = (random.uniform, -5.12, 5.12) # attribute function for rastrigin
 # attr_function = (random.randint, 0, 1) # binary attribute function
 
 # mutate_function = (tools.mutGaussian, {'mu': 0, 'sigma': 0.1, 'indpb': 0.05})
-mutate_function = (tools.mutGaussian, {'mu': 0, 'sigma': 0.05, 'indpb': 1})
+mutate_function = (tools.mutGaussian, {'mu': 0, 'sigma': 0.1, 'indpb': 0.5})
 # mutate_function = (tools.mutFlipBit, {'indpb': 0.05})
 
 # fitness_function = (OneMax_fitness, {'noise_function': random_bit_flip, 'noise_intensity': 50})
@@ -538,7 +525,7 @@ UMDA_params = {
     'true_fitness_function': None, # noise-less fitness function for performance evaluation
 }
 
-n_runs = 10
+n_runs = 200
 run_exp(HC, EA_params, n_runs, problem_name, problem_info, suffix='')
 # run_exp(UMDA, UMDA_params, n_runs, problem_name, problem_info, suffix='')
 

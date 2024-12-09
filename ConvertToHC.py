@@ -26,4 +26,4 @@ def get_local_optima(folder, filename):
     
     print(f"Local optima saved to {save_path}")
 
-get_local_optima('data/rastriginN2A10', 'EA_g100_p100_20241203025512')
+get_local_optima('data/rastriginN2A10', 'HC_g10000_pNA_20241209021744')
