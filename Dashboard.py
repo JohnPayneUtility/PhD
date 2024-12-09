@@ -49,13 +49,13 @@ app.layout = html.Div([
         multi=True
     ),
     dcc.Store(id='loaded-data-store'),
-    dcc.Slider(
-        id='n-runs-slider',
-        min=1,
-        max=10,
-        step=1,
-        value=5,  # Default value
-        marks={i: str(i) for i in range(1, 11)},
+    dcc.Input(
+    id='run-selector',
+    type='number',
+    min=1,
+    max=100,
+    step=1,
+    value=1  # Default value
     ),
     dcc.Checklist(
         id='options',
@@ -192,7 +192,7 @@ def load_data(selected_folder, selected_files):
      Input('layout', 'value'),
      Input('hover-info', 'value'),
      Input('loaded-data-store', 'data'),
-     Input('n-runs-slider', 'value'),
+     Input('run-selector', 'value'),
      Input('local-optima', 'data')]
 )
 def update_plot(options, layout_value, hover_info_value, all_trajectories_list, n_runs_display, local_optima):
