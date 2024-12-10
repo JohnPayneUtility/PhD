@@ -102,7 +102,15 @@ app.layout = html.Div([
         placeholder='Select hover information',
         style={'width': '50%', 'marginTop': '10px'}
     ),
-    html.Div([
+    dcc.Checklist(
+        id='use-range-sliders',
+        options=[
+            {'label': 'limit axis ranges', 'value': 'ENABLED'}
+        ],
+        value=[]  # Default is unchecked
+    ),
+    html.Div(
+    [
         html.Label("X-axis range"),
         dcc.Slider(
             id='x-axis-slider',
@@ -112,23 +120,40 @@ app.layout = html.Div([
             value=5,  # Default range
             marks={i: f"{i}" for i in range(1, 11)}
         )
-    ], style={'width': '50%', 'margin': 'auto'}),
-    html.Div([
-        html.Label("Y-axis range"),
-        dcc.Slider(
-            id='y-axis-slider',
-            min=1,
-            max=10,
-            step=0.1,
-            value=5,  # Default range
-            marks={i: f"{i}" for i in range(1, 11)}
-        )
-    ], style={'width': '50%', 'margin': 'auto'}),
+    ],
+    id='x-slider-container',  # Add an ID for the container
+    style={'display': 'none'}  # Initially hidden
+    ),
+    html.Div(
+        [
+            html.Label("Y-axis range"),
+            dcc.Slider(
+                id='y-axis-slider',
+                min=1,
+                max=10,
+                step=0.1,
+                value=5,  # Default range
+                marks={i: f"{i}" for i in range(1, 11)}
+            )
+        ],
+        id='y-slider-container',  # Add an ID for the container
+        style={'display': 'none'}  # Initially hidden
+    ),
     dcc.Graph(id='trajectory-plot'),
     dcc.Store(id='algo-info'),
     html.Div(id='display-algo-info', style={'marginTop': '10px'}),
     html.P(id='unique-solutions-display', children='', style={'marginTop': '20px'})
 ])
+
+@app.callback(
+    [Output('x-slider-container', 'style'),
+     Output('y-slider-container', 'style')],
+    Input('use-range-sliders', 'value')
+)
+def toggle_range_elements(value):
+    if 'ENABLED' in value:
+        return {'display': 'block'}, {'display': 'block'}  # Show both containers
+    return {'display': 'none'}, {'display': 'none'}  # Hide both containers
 
 # File selection
 @app.callback(
@@ -209,10 +234,10 @@ def load_data(selected_folder, selected_files):
             all_info_files_list.append({"error": "Algo info not available"})
 
     # Generate unique solutions text
-    unique_solutions_text = [
+    unique_solutions_text = str([
         (f"Algorithm {idx + 1} - First Run Unique Solutions:\n{trajectories[0][1]}\n\n", idx)
         for idx, trajectories in enumerate(all_trajectories_list) if trajectories
-    ]
+    ])
 
     return all_trajectories_list, all_info_files_list, unique_solutions_text
 
@@ -260,12 +285,13 @@ def update_algo_info(all_info_files_list):
      Input('loaded-data-store', 'data'),
      Input('run-selector', 'value'),
      Input('local-optima', 'data'),
+     Input('use-range-sliders', 'value'),
      Input('x-axis-slider', 'value'),
     Input('y-axis-slider', 'value')]
 )
-def update_plot(options, layout_value, hover_info_value, all_trajectories_list, n_runs_display, local_optima, x_slider, y_slider):
-    if not all_trajectories_list:
-        return go.Figure()
+def update_plot(options, layout_value, hover_info_value, all_trajectories_list, n_runs_display, local_optima, use_range_slider, x_slider, y_slider):
+    # if not all_trajectories_list:
+    #     return go.Figure()
     
     # Options from checkboxes
     show_labels = 'show_labels' in options
@@ -287,9 +313,8 @@ def update_plot(options, layout_value, hover_info_value, all_trajectories_list, 
     node_mapping = {}  # To ensure unique solutions map to the same node
     start_nodes = set()
     end_nodes = set()
+    overall_best_fitness = 0
     overall_best_node = None
-
-    optimisation_goal = determine_optimisation_goal(all_trajectories_list)
 
     # Function to calculate Hamming distance
     def hamming_distance(sol1, sol2):
@@ -299,19 +324,16 @@ def update_plot(options, layout_value, hover_info_value, all_trajectories_list, 
         if optimisation_goal == 'max':
             # Sort runs by the best (highest) final fitness, in descending order
             sorted_runs = sorted(all_run_trajectories, 
-                                key=lambda run: run[1][-1],  # Access the last fitness value in the unique_fitnesses list
+                                key=lambda run: run[1][-1],
                                 reverse=True)
         else:
             # Sort runs by the best (lowest) final fitness, in ascending order
             sorted_runs = sorted(all_run_trajectories, 
-                                key=lambda run: run[1][-1],  # Access the last fitness value in the unique_fitnesses list
+                                key=lambda run: run[1][-1],
                                 reverse=False)
-        
-        # Cap the number of runs to display
-        top_runs = sorted_runs[:n_runs_display]
-        
+        top_runs = sorted_runs[:n_runs_display] # Cap the number of runs to display
         return top_runs
-
+    
     # Function to add nodes and edges to the graph
     def add_trajectories_to_graph(all_run_trajectories, edge_color):
         for run_idx, (unique_solutions, unique_fitnesses, solution_iterations, transitions) in enumerate(all_run_trajectories):
@@ -336,12 +358,27 @@ def update_plot(options, layout_value, hover_info_value, all_trajectories_list, 
                 current_solution = tuple(current_solution)
                 if prev_solution in node_mapping and current_solution in node_mapping:
                     G.add_edge(node_mapping[prev_solution], node_mapping[current_solution], color=edge_color)
+    
+    # Add trajectory nodes if provided
+    if all_trajectories_list:
+        # Determine optimisation goal
+        optimisation_goal = determine_optimisation_goal(all_trajectories_list)
 
-    # Add all sets of trajectories to the graph
-    for idx, all_run_trajectories in enumerate(all_trajectories_list):
-        edge_color = algo_colors[idx % len(algo_colors)]  # Cycle through colors if there are more sets than colors
-        selected_trajectories = select_top_runs_by_fitness(all_run_trajectories, n_runs_display, optimisation_goal)
-        add_trajectories_to_graph(selected_trajectories, edge_color)
+        # Add all sets of trajectories to the graph
+        for idx, all_run_trajectories in enumerate(all_trajectories_list):
+            edge_color = algo_colors[idx % len(algo_colors)]  # Cycle through colors if there are more sets than colors
+            selected_trajectories = select_top_runs_by_fitness(all_run_trajectories, n_runs_display, optimisation_goal)
+            add_trajectories_to_graph(selected_trajectories, edge_color)
+
+        # Find the overall best solution across all sets of trajectories
+        if optimisation_goal == "max":
+            overall_best_fitness = max(
+                max(best_fitnesses) for all_run_trajectories in all_trajectories_list for _, best_fitnesses, _, _ in all_run_trajectories
+            )
+        else:  # Minimisation
+            overall_best_fitness = min(
+                min(best_fitnesses) for all_run_trajectories in all_trajectories_list for _, best_fitnesses, _, _ in all_run_trajectories
+            )
     
     # Add local optima nodes if provided
     if local_optima:
@@ -353,17 +390,9 @@ def update_plot(options, layout_value, hover_info_value, all_trajectories_list, 
                 node_mapping[solution_tuple] = node_label
                 G.add_node(node_label, solution=solution, fitness=fitness)
 
-    # Find the overall best solution across all sets of trajectories
-    if optimisation_goal == "max":
-        overall_best_fitness = max(
-            max(best_fitnesses) for all_run_trajectories in all_trajectories_list for _, best_fitnesses, _, _ in all_run_trajectories
-        )
-    else:  # Minimisation
-        overall_best_fitness = min(
-            min(best_fitnesses) for all_run_trajectories in all_trajectories_list for _, best_fitnesses, _, _ in all_run_trajectories
-        )
-
     # Find overall best solution from local optima
+    if not all_trajectories_list:
+        optimisation_goal = 'max'
     if local_optima:
         local_optima_solutions, local_optima_fitnesses = local_optima
         if optimisation_goal == "max":
@@ -479,8 +508,18 @@ def update_plot(options, layout_value, hover_info_value, all_trajectories_list, 
         edge_trace.append(trace)
 
     # Set x and y axis ranges based on slider
-    x_range = [-x_slider, x_slider]
-    y_range = [-y_slider, y_slider]
+    if 'ENABLED' in use_range_slider:
+        x_range = [-x_slider, x_slider]
+        y_range = [-y_slider, y_slider]
+    else:
+        if len(G.nodes) > 0:
+            x_values = [pos[node][0] for node in G.nodes()]
+            y_values = [pos[node][1] for node in G.nodes()]
+            x_range = [min(x_values) - 1, max(x_values) + 1]
+            y_range = [min(y_values) - 1, max(y_values) + 1]
+        else:
+            x_range = [-10, 10]  # Default
+            y_range = [-10, 10]  # Default
 
     if plot_3D:
         # 3D Plotting logic
