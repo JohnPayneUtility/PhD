@@ -401,18 +401,25 @@ def conduct_runs(num_runs, algorithm_function, param_dict):
     
     return all_run_trajectories
 
-def serialize_functions(parameters):
+def serialize_parameters(parameters):
     """
-    Convert any functions or non-serializable objects in a dictionary to strings.
+    Convert any functions or non-serializable objects in a dictionary to strings,
+    and ensure compatibility with JSON.
     """
     def convert_value(value):
         if callable(value):  # Check if it's a function or callable object
             return value.__name__
-        elif isinstance(value, tuple):  # Handle tuples that may contain functions
+        elif isinstance(value, (np.integer, np.floating)):  # Handle NumPy numbers
+            return value.item()
+        elif isinstance(value, np.ndarray):  # Handle NumPy arrays
+            return value.tolist()  # Convert array to list
+        elif isinstance(value, tuple):  # Handle tuples that may contain functions or arrays
             return tuple(convert_value(v) for v in value)
         elif isinstance(value, dict):  # Handle nested dictionaries
             return {k: convert_value(v) for k, v in value.items()}
-        return value  # Leave serializable objects unchanged
+        elif isinstance(value, list):  # Handle lists that may contain non-serializable types
+            return [convert_value(v) for v in value]
+        return value  # Leave JSON-serializable objects unchanged
 
     return {key: convert_value(value) for key, value in parameters.items()}
 
@@ -435,7 +442,7 @@ def save_parameters(parameters, problem_name, algo_name):
     folder_path = 'data/' +  problem_name
     file_name = algo_name + '.json'
 
-    serializable_params = serialize_functions(parameters)
+    serializable_params = serialize_parameters(parameters)
 
     # Create the folder if it does not exist
     if not os.path.exists(folder_path):
@@ -495,25 +502,43 @@ def run_exp(algo, parameters, n_runs, problem_name, problem_info, suffix=''):
 # Define problem and parameters and conduct runs
 # Problem information
 # problem_name = 'TestSpace'
-problem_name = 'rastriginN2A10'
+# problem_name = 'rastriginN2A10'
 # problem_name = 'rastrigin_N10A10'
+# problem_name = 'f2_l-d_kp_20_878'
+# problem_name = 'knapPI_1_100_1000_1'
+problem_name = 'knapPI_3_100_1000_1'
 
-n_items = 2
+n_items, capacity, optimal, values, weights, items_dict = load_problem_KP(problem_name)
+
+print(n_items)
+# n_items = 2
 # problem_name = f'OneMax_{n_items}_noise'
+
+# problem_info = {
+#     'number of items': n_items,
+# }
+
 problem_info = {
     'number of items': n_items,
+    'capcity': capacity,
+    'optimal': optimal,
+    'values': values,
+    'weights': weights
 }
+ss = generate_zero_solution(n_items)
 
-attr_function = (random.uniform, -5.12, 5.12) # attribute function for rastrigin
-# attr_function = (random.randint, 0, 1) # binary attribute function
+# attr_function = (random.uniform, -5.12, 5.12) # attribute function for rastrigin
+attr_function = (random.randint, 0, 1) # binary attribute function
 
 # mutate_function = (tools.mutGaussian, {'mu': 0, 'sigma': 0.1, 'indpb': 0.05})
-mutate_function = (tools.mutGaussian, {'mu': 0, 'sigma': 0.1, 'indpb': 0.5})
-# mutate_function = (tools.mutFlipBit, {'indpb': 0.05})
+# mutate_function = (tools.mutGaussian, {'mu': 0, 'sigma': 0.1, 'indpb': 0.5})
+mutate_function = (tools.mutFlipBit, {'indpb': 0.01})
 
 # fitness_function = (OneMax_fitness, {'noise_function': random_bit_flip, 'noise_intensity': 50})
-fitness_function = (rastrigin_eval, {'amplitude':10})
+# fitness_function = (rastrigin_eval, {'amplitude':10})
 # fitness_function_true = (OneMax_fitness, {})
+fitness_function = (eval_ind_kp, {'items_dict': items_dict, 'capacity': capacity, 'penalty': 0})
+
 
 # # Algorithm information
 HC_params = {
@@ -521,11 +546,11 @@ HC_params = {
     # 'popsize': 100, # Population size
     'tournsize': 10, # Tournament selection size
     'len_sol': n_items, # solution length
-    'weights': (-1.0,),
+    'weights': (1.0,),
     'attr_function': attr_function,
     'mutate_function': mutate_function,
     'fitness_function': fitness_function, # algorithm objective function
-    'starting_solution': None, # Specified starting solution for all individuals
+    'starting_solution': ss, # Specified starting solution for all individuals
     'true_fitness_function': None, # noise-less fitness function for performance evaluation
     # 'n_elite': 10
 }
@@ -534,11 +559,11 @@ EA_params = {
     'popsize': 100, # Population size
     'tournsize': 10, # Tournament selection size
     'len_sol': n_items, # solution length
-    'weights': (-1.0,),
+    'weights': (1.0,),
     'attr_function': attr_function,
     'mutate_function': mutate_function,
     'fitness_function': fitness_function, # algorithm objective function
-    'starting_solution': None, # Specified starting solution for all individuals
+    'starting_solution': ss, # Specified starting solution for all individuals
     'true_fitness_function': None, # noise-less fitness function for performance evaluation
     'n_elite': 10
 }
@@ -547,7 +572,7 @@ UMDA_params = {
     'popsize': 100, # Population size
     'selectsize': 50, # Size selected for distribution
     'len_sol': n_items, # solution length
-    'weights': (-1.0,),
+    'weights': (1.0,),
     'attr_function': attr_function,
     'mutate_function': None,
     'fitness_function': fitness_function, # algorithm objective function
@@ -555,16 +580,21 @@ UMDA_params = {
     'true_fitness_function': None, # noise-less fitness function for performance evaluation
 }
 
+n_runs = 100
+run_exp(HC, HC_params, n_runs, problem_name, problem_info, suffix='')
 n_runs = 10
-# run_exp(HC, HC_params, n_runs, problem_name, problem_info, suffix='')
 # run_exp(UMDA, UMDA_params, n_runs, problem_name, problem_info, suffix='')
-run_exp(EA, EA_params, n_runs, problem_name, problem_info, suffix='')
-EA_params['tournsize'] = 20
-# run_exp(EA, EA_params, n_runs, problem_name, problem_info, suffix='')
-EA_params['tournsize'] = 30
-# run_exp(EA, EA_params, n_runs, problem_name, problem_info, suffix='')
-EA_params['tournsize'] = 50
 # run_exp(EA, EA_params, n_runs, problem_name, problem_info, suffix='')
 
+# EA_params['popsize'] = 25
+# run_exp(EA, EA_params, n_runs, problem_name, problem_info, suffix='')
+# EA_params['popsize'] = 50
+# run_exp(EA, EA_params, n_runs, problem_name, problem_info, suffix='')
+# EA_params['popsize'] = 100
+# run_exp(EA, EA_params, n_runs, problem_name, problem_info, suffix='')
+# EA_params['popsize'] = 150
+# run_exp(EA, EA_params, n_runs, problem_name, problem_info, suffix='')
+# EA_params['popsize'] = 200
+# run_exp(EA, EA_params, n_runs, problem_name, problem_info, suffix='')
 
 # print('complete')
