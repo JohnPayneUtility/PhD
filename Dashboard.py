@@ -60,14 +60,30 @@ app.layout = html.Div([
         multi=True
     ),
     dcc.Store(id='loaded-data-store'),
-    dcc.Input(
-    id='run-selector',
-    type='number',
-    min=1,
-    max=100,
-    step=1,
-    value=1  # Default value
+    html.Div([
+        html.Label("Select number of runs to show:"),
+    ], style={'display': 'inline-block', 'margin-right': '10px'}),
+    html.Div([
+        dcc.Input(
+            id='run-selector',
+            type='number',
+            min=0,
+            max=100,
+            step=1,
+            value=1
+        ),
+    ], style={'display': 'inline-block'}),
+    dcc.Checklist(
+        id='run-options',
+        options=[
+            {'label': 'Show best run', 'value': 'show_best'},
+            {'label': 'Show mean runs', 'value': 'show_mean'},
+            {'label': 'Show median runs', 'value': 'show_median'},
+            {'label': 'Show worst run', 'value': 'show_worst'}
+        ],
+        value=[]
     ),
+    html.Hr(),
     dcc.Checklist(
         id='options',
         options=[
@@ -280,6 +296,7 @@ def update_algo_info(all_info_files_list):
 @app.callback(
     Output('trajectory-plot', 'figure'),
     [Input('options', 'value'),
+     Input('run-options', 'value'),
      Input('layout', 'value'),
      Input('hover-info', 'value'),
      Input('loaded-data-store', 'data'),
@@ -289,7 +306,7 @@ def update_algo_info(all_info_files_list):
      Input('x-axis-slider', 'value'),
     Input('y-axis-slider', 'value')]
 )
-def update_plot(options, layout_value, hover_info_value, all_trajectories_list, n_runs_display, local_optima, use_range_slider, x_slider, y_slider):
+def update_plot(options, run_options, layout_value, hover_info_value, all_trajectories_list, n_runs_display, local_optima, use_range_slider, x_slider, y_slider):
     # if not all_trajectories_list:
     #     return go.Figure()
     
@@ -298,6 +315,12 @@ def update_plot(options, layout_value, hover_info_value, all_trajectories_list, 
     hide_nodes = 'hide_nodes' in options
     plot_3D = 'plot_3D' in options
     use_solution_iterations = 'use_solution_iterations' in options
+
+    # Run options
+    show_best = 'show_best' in run_options
+    show_mean = 'show_mean' in run_options
+    show_median = 'show_median' in run_options
+    show_worst = 'show_worst' in run_options
 
     # Options from dropdowns
     layout = layout_value
@@ -334,6 +357,18 @@ def update_plot(options, layout_value, hover_info_value, all_trajectories_list, 
         top_runs = sorted_runs[:n_runs_display] # Cap the number of runs to display
         return top_runs
     
+    def get_mean_run(all_run_trajectories):
+        final_fitnesses = [run[1][-1] for run in all_run_trajectories]
+        mean_final_fitness = np.mean(final_fitnesses)
+        closest_run_idx = np.argmin([abs(fitness - mean_final_fitness) for fitness in final_fitnesses])
+        return all_run_trajectories[closest_run_idx]
+    
+    def get_median_run(all_run_trajectories):
+        final_fitnesses = [run[1][-1] for run in all_run_trajectories]
+        median_final_fitness = np.median(final_fitnesses)
+        closest_run_idx = np.argmin([abs(fitness - median_final_fitness) for fitness in final_fitnesses])
+        return all_run_trajectories[closest_run_idx]
+    
     # Function to add nodes and edges to the graph
     def add_trajectories_to_graph(all_run_trajectories, edge_color):
         for run_idx, (unique_solutions, unique_fitnesses, solution_iterations, transitions) in enumerate(all_run_trajectories):
@@ -367,8 +402,24 @@ def update_plot(options, layout_value, hover_info_value, all_trajectories_list, 
         # Add all sets of trajectories to the graph
         for idx, all_run_trajectories in enumerate(all_trajectories_list):
             edge_color = algo_colors[idx % len(algo_colors)]  # Cycle through colors if there are more sets than colors
-            selected_trajectories = select_top_runs_by_fitness(all_run_trajectories, n_runs_display, optimisation_goal)
-            add_trajectories_to_graph(selected_trajectories, edge_color)
+
+            if n_runs_display > 0:
+                selected_trajectories = all_run_trajectories[:n_runs_display]
+                add_trajectories_to_graph(selected_trajectories, edge_color)
+            if show_best:
+                selected_trajectories = select_top_runs_by_fitness(all_run_trajectories, 1, optimisation_goal)
+                add_trajectories_to_graph(selected_trajectories, edge_color)
+            if show_mean:
+                selected_trajectories = [get_mean_run(all_run_trajectories)]
+                add_trajectories_to_graph(selected_trajectories, edge_color)
+            if show_median:
+                selected_trajectories = [get_median_run(all_run_trajectories)]
+                add_trajectories_to_graph(selected_trajectories, edge_color)
+            if show_worst:
+                anti_optimisation_goal = 'min' if optimisation_goal == 'max' else 'max'
+                selected_trajectories = select_top_runs_by_fitness(all_run_trajectories, 1, anti_optimisation_goal)
+                add_trajectories_to_graph(selected_trajectories, edge_color)
+        
 
         # Find the overall best solution across all sets of trajectories
         if optimisation_goal == "max":
