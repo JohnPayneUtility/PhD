@@ -506,7 +506,8 @@ def run_exp(algo, parameters, n_runs, problem_name, problem_info, suffix=''):
 # problem_name = 'rastrigin_N10A10'
 # problem_name = 'f2_l-d_kp_20_878'
 # problem_name = 'knapPI_1_100_1000_1'
-problem_name = 'knapPI_3_100_1000_1'
+problem_name = 'knapPI_2_100_1000_1'
+# problem_name = 'knapPI_3_100_1000_1'
 
 n_items, capacity, optimal, values, weights, items_dict = load_problem_KP(problem_name)
 
@@ -580,11 +581,11 @@ UMDA_params = {
     'true_fitness_function': None, # noise-less fitness function for performance evaluation
 }
 
-n_runs = 100
+# n_runs = 100
 # run_exp(HC, HC_params, n_runs, problem_name, problem_info, suffix='')
-n_runs = 10
-run_exp(UMDA, UMDA_params, n_runs, problem_name, problem_info, suffix='')
-run_exp(EA, EA_params, n_runs, problem_name, problem_info, suffix='')
+# n_runs = 10
+# run_exp(UMDA, UMDA_params, n_runs, problem_name, problem_info, suffix='')
+# run_exp(EA, EA_params, n_runs, problem_name, problem_info, suffix='')
 
 # EA_params['popsize'] = 25
 # run_exp(EA, EA_params, n_runs, problem_name, problem_info, suffix='')
@@ -598,3 +599,65 @@ run_exp(EA, EA_params, n_runs, problem_name, problem_info, suffix='')
 # run_exp(EA, EA_params, n_runs, problem_name, problem_info, suffix='')
 
 # print('complete')
+
+from concurrent.futures import ProcessPoolExecutor
+import multiprocessing
+
+def run_algorithm(args):
+    """Wrapper function to run a single algorithm instance."""
+    algorithm_function, param_dict = args
+    all_generations, best_solutions, best_fitnesses, true_fitnesses = algorithm_function(**param_dict)
+    
+    # Extract trajectories and transitions
+    unique_solutions, unique_fitnesses, solution_iterations = extract_trajectory_data(best_solutions, true_fitnesses)
+    transitions = extract_transitions(unique_solutions)
+    
+    return unique_solutions, unique_fitnesses, solution_iterations, transitions
+
+def conduct_runs_parallel(num_runs, algorithm_function, param_dict):
+    """Conducts multiple algorithm runs in parallel."""
+    # Prepare arguments for each run
+    args = [(algorithm_function, param_dict) for _ in range(num_runs)]
+
+    # Use ProcessPoolExecutor for parallel execution
+    with ProcessPoolExecutor(max_workers=multiprocessing.cpu_count()) as executor:
+        results = list(executor.map(run_algorithm, args))
+
+    return results
+
+def run_exp_parallel(algo, parameters, n_runs, problem_name, problem_info, suffix=''):
+    name = get_exp_name(algo, parameters, suffix)
+    data = conduct_runs_parallel(n_runs, algo, parameters)
+    save_data(data, problem_name, name)
+    save_parameters(parameters, problem_name, name)
+    save_problem(problem_info, problem_name)
+    print('Experiment Complete')
+
+if __name__ == "__main__":
+    problem_name = 'knapPI_2_100_1000_1'
+    n_items, capacity, optimal, values, weights, items_dict = load_problem_KP(problem_name)
+    problem_info = {
+    'number of items': n_items,
+    'capcity': capacity,
+    'optimal': optimal,
+    'values': values,
+    'weights': weights
+    }
+    attr_function = (random.randint, 0, 1) # binary attribute function
+    mutate_function = (tools.mutFlipBit, {'indpb': 0.01})
+    fitness_function = (eval_ind_kp, {'items_dict': items_dict, 'capacity': capacity, 'penalty': 1})
+    HC_params = {
+    'NGEN': 100000, # Number of generations
+    # 'popsize': 100, # Population size
+    'tournsize': 10, # Tournament selection size
+    'len_sol': n_items, # solution length
+    'weights': (1.0,),
+    'attr_function': attr_function,
+    'mutate_function': mutate_function,
+    'fitness_function': fitness_function, # algorithm objective function
+    'starting_solution': None, # Specified starting solution for all individuals
+    'true_fitness_function': None, # noise-less fitness function for performance evaluation
+    # 'n_elite': 10
+    }
+    n_runs = 300
+    run_exp_parallel(HC, HC_params, n_runs, problem_name, problem_info, suffix='')
