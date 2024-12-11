@@ -65,7 +65,7 @@ def eval_ind_kp(individual, items_dict, capacity, penalty=1):
     # Check if over capacity and return reduced value
     if weight > capacity:
         if penalty == 1:
-            value_with_penalty = value - (weight - capacity)
+            value_with_penalty = capacity - weight
             return (value_with_penalty,)
         else:
             return (0,)
@@ -537,12 +537,12 @@ mutate_function = (tools.mutFlipBit, {'indpb': 0.01})
 # fitness_function = (OneMax_fitness, {'noise_function': random_bit_flip, 'noise_intensity': 50})
 # fitness_function = (rastrigin_eval, {'amplitude':10})
 # fitness_function_true = (OneMax_fitness, {})
-fitness_function = (eval_ind_kp, {'items_dict': items_dict, 'capacity': capacity, 'penalty': 0})
+fitness_function = (eval_ind_kp, {'items_dict': items_dict, 'capacity': capacity, 'penalty': 1})
 
 
 # # Algorithm information
 HC_params = {
-    'NGEN': 10000, # Number of generations
+    'NGEN': 100000, # Number of generations
     # 'popsize': 100, # Population size
     'tournsize': 10, # Tournament selection size
     'len_sol': n_items, # solution length
@@ -550,12 +550,12 @@ HC_params = {
     'attr_function': attr_function,
     'mutate_function': mutate_function,
     'fitness_function': fitness_function, # algorithm objective function
-    'starting_solution': ss, # Specified starting solution for all individuals
+    'starting_solution': None, # Specified starting solution for all individuals
     'true_fitness_function': None, # noise-less fitness function for performance evaluation
     # 'n_elite': 10
 }
 EA_params = {
-    'NGEN': 1000, # Number of generations
+    'NGEN': 10000, # Number of generations
     'popsize': 100, # Population size
     'tournsize': 10, # Tournament selection size
     'len_sol': n_items, # solution length
@@ -568,7 +568,7 @@ EA_params = {
     'n_elite': 10
 }
 UMDA_params = {
-    'NGEN': 100, # Number of generations
+    'NGEN': 1000, # Number of generations
     'popsize': 100, # Population size
     'selectsize': 50, # Size selected for distribution
     'len_sol': n_items, # solution length
@@ -581,10 +581,10 @@ UMDA_params = {
 }
 
 n_runs = 100
-run_exp(HC, HC_params, n_runs, problem_name, problem_info, suffix='')
+# run_exp(HC, HC_params, n_runs, problem_name, problem_info, suffix='')
 n_runs = 10
-# run_exp(UMDA, UMDA_params, n_runs, problem_name, problem_info, suffix='')
-# run_exp(EA, EA_params, n_runs, problem_name, problem_info, suffix='')
+run_exp(UMDA, UMDA_params, n_runs, problem_name, problem_info, suffix='')
+run_exp(EA, EA_params, n_runs, problem_name, problem_info, suffix='')
 
 # EA_params['popsize'] = 25
 # run_exp(EA, EA_params, n_runs, problem_name, problem_info, suffix='')
