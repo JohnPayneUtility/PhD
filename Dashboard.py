@@ -403,22 +403,20 @@ def update_plot(options, run_options, layout_value, hover_info_value, all_trajec
         for idx, all_run_trajectories in enumerate(all_trajectories_list):
             edge_color = algo_colors[idx % len(algo_colors)]  # Cycle through colors if there are more sets than colors
 
+            selected_trajectories = []
             if n_runs_display > 0:
-                selected_trajectories = all_run_trajectories[:n_runs_display]
-                add_trajectories_to_graph(selected_trajectories, edge_color)
+                selected_trajectories.extend(all_run_trajectories[:n_runs_display])
             if show_best:
-                selected_trajectories = select_top_runs_by_fitness(all_run_trajectories, 1, optimisation_goal)
-                add_trajectories_to_graph(selected_trajectories, edge_color)
+                selected_trajectories.extend(select_top_runs_by_fitness(all_run_trajectories, 1, optimisation_goal))
             if show_mean:
-                selected_trajectories = [get_mean_run(all_run_trajectories)]
-                add_trajectories_to_graph(selected_trajectories, edge_color)
+                selected_trajectories.extend([get_mean_run(all_run_trajectories)])
             if show_median:
-                selected_trajectories = [get_median_run(all_run_trajectories)]
-                add_trajectories_to_graph(selected_trajectories, edge_color)
+                selected_trajectories.extend([get_median_run(all_run_trajectories)])
             if show_worst:
                 anti_optimisation_goal = 'min' if optimisation_goal == 'max' else 'max'
-                selected_trajectories = select_top_runs_by_fitness(all_run_trajectories, 1, anti_optimisation_goal)
-                add_trajectories_to_graph(selected_trajectories, edge_color)
+                selected_trajectories.extend(select_top_runs_by_fitness(all_run_trajectories, 1, anti_optimisation_goal))
+
+            add_trajectories_to_graph(selected_trajectories, edge_color)
         
 
         # Find the overall best solution across all sets of trajectories
@@ -444,6 +442,7 @@ def update_plot(options, run_options, layout_value, hover_info_value, all_trajec
     # Find overall best solution from local optima
     if not all_trajectories_list:
         optimisation_goal = 'max'
+    
     if local_optima:
         local_optima_solutions, local_optima_fitnesses = local_optima
         if optimisation_goal == "max":
