@@ -15,6 +15,8 @@ def get_local_optima(folder, filename, maximisation=True, filtering='same', simi
     solution_fitness_pairs = list(zip(final_unique_solutions, final_unique_fitnesses))
     solution_fitness_pairs.sort(key=lambda x: x[1], reverse=maximisation)
 
+    print(f'pre:{len(final_unique_fitnesses)}')
+
     if filtering == 'similar':
         # Filter out solutions that are similar in both elements and fitness
         filtered_pairs = []
@@ -34,6 +36,7 @@ def get_local_optima(folder, filename, maximisation=True, filtering='same', simi
         final_unique_solutions_no_duplicates = [pair[0] for pair in unique_pairs.values()]
         final_unique_fitnesses_no_duplicates = [pair[1] for pair in unique_pairs.values()]
 
+    print(f'post:{len(final_unique_fitnesses_no_duplicates)}')
     # Print max and min fitness info
     max_fitness = max(final_unique_fitnesses_no_duplicates)
     min_fitness = min(final_unique_fitnesses_no_duplicates)
@@ -50,4 +53,4 @@ def get_local_optima(folder, filename, maximisation=True, filtering='same', simi
     print(f"Local optima saved to {save_path}")
 
 # get_local_optima('data/rastriginN2A10', 'HC_g10000_pNA_20241209021744')
-get_local_optima('data/knapPI_2_100_1000_1', 'HC_g100000_pNA_20241211155705', maximisation=True, filtering='same')
+get_local_optima('data/knapPI_2_100_1000_1', 'HC_g100000_pNA_20241212012120', maximisation=True, filtering='same')

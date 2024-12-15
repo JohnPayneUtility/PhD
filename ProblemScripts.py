@@ -1,4 +1,4 @@
-def load_problem_KP(filename):
+def load_problem_KP(filename, verbose=False):
     " Description of function "
     import numpy as np
     import os
@@ -29,11 +29,12 @@ def load_problem_KP(filename):
         items_dict[i] = (values[i], weights[i])
 
     # Print problem information
-    print("number of items:", n_items)
-    print("max weight:", capacity)
-    print("values:", values)
-    print("weights:", weights)
-    print("optimal solution:", optimal)
+    if verbose:
+        print("number of items:", n_items)
+        print("max weight:", capacity)
+        print("values:", values)
+        print("weights:", weights)
+        print("optimal solution:", optimal)
 
     # Return problem data
     return n_items, capacity, optimal, values, weights, items_dict

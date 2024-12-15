@@ -28,12 +28,16 @@ def generate_zero_solution(length):
 #         bit_list[index_to_flip] = 1 - bit_list[index_to_flip]
 #     return bit_list
 
-def random_bit_flip(bit_list, n_flips=1):
+def random_bit_flip(bit_list, n_flips=1, exclude_indices=None):
     # Ensure n_flips does not exceed the length of bit_list
     n_flips = min(n_flips, len(bit_list))
     
     flipped_indices = set()
-    
+    if exclude_indices:
+        flipped_indices.update(exclude_indices)
+    if len(flipped_indices) == len(bit_list):
+            return bit_list, flipped_indices
+
     for _ in range(n_flips):
         # Select a unique random index to flip
         index_to_flip = random.randint(0, len(bit_list) - 1)
@@ -41,13 +45,14 @@ def random_bit_flip(bit_list, n_flips=1):
         while index_to_flip in flipped_indices:
             index_to_flip = random.randint(0, len(bit_list) - 1)
         
-        # Perform the bit flip (0 to 1 or 1 to 0)
-        bit_list[index_to_flip] = 1 - bit_list[index_to_flip]
+        bit_list[index_to_flip] = 1 - bit_list[index_to_flip] # bit flip
         
         # Record the flipped index
         flipped_indices.add(index_to_flip)
+        if len(flipped_indices) == len(bit_list):
+            return bit_list, flipped_indices
     
-    return bit_list
+    return bit_list, flipped_indices
 
 def OneMax_fitness(individual, noise_function=None, noise_intensity=1):
     """ Function calculates fitness for OneMax problem individual """
@@ -102,7 +107,7 @@ def timestamp():
 
 # Algorithm functions
 # 1+1 HC
-def HC(NGEN, tournsize, len_sol, weights, attr_function=None, mutate_function=None, fitness_function=None, starting_solution=None, true_fitness_function=None):
+def HC(NGEN, len_sol, weights, attr_function=None, mutate_function=None, purturbation=True, fitness_function=None, starting_solution=None, true_fitness_function=None):
     # Set population size to 1 for 1+1 hill climbing
     popsize = 1
 
@@ -131,7 +136,8 @@ def HC(NGEN, tournsize, len_sol, weights, attr_function=None, mutate_function=No
     # Register mutation function using parameters provided
     if mutate_function is None:
         raise ValueError("Mutation function must be provided (e.g., tools.mutGaussian, mu=0, sigma=1.0, indpb=indpb or tools.mutFlipBit, indpb=indpb)")
-    toolbox.register("mutate", lambda ind: mutate_function[0](ind, **mutate_function[1]))
+    # toolbox.register("mutate", lambda ind: mutate_function[0](ind, **mutate_function[1]))
+    toolbox.register("mutate", lambda ind, flipped_indices: mutate_function[0](ind, exclude_indices=flipped_indices, **mutate_function[1]))
 
     # Create an initial population of individuals
     population = toolbox.population(n=popsize)
@@ -152,12 +158,13 @@ def HC(NGEN, tournsize, len_sol, weights, attr_function=None, mutate_function=No
 
     # Record initial population
     record_population_state(data, population, toolbox, true_fitness_function)
+    flipped_indices = set()
 
     # Evolutionary loop for each generation
     for gen in trange(NGEN, desc='Evolving EA Solutions'):
         # Generate a single mutant from the current solution
         mutant = toolbox.clone(population[0])
-        toolbox.mutate(mutant)  # Mutate the individual
+        mutant[:], flipped_indices = toolbox.mutate(mutant, flipped_indices)
         del mutant.fitness.values  # Delete fitness to mark it as needing reevaluation
 
         # Evaluate the mutant
@@ -166,9 +173,29 @@ def HC(NGEN, tournsize, len_sol, weights, attr_function=None, mutate_function=No
         # Replace the current solution with the mutant if it is better
         if tools.selBest([population[0], mutant], 1)[0] is mutant:
             population[0] = mutant
+            flipped_indices = set()
 
         # Record current population
-        record_population_state(data, population, toolbox, true_fitness_function)
+        # record_population_state(data, population, toolbox, true_fitness_function)
+
+        # Escape if all possible mutations applied with no improvement
+        if len(flipped_indices) == len_sol:
+            record_population_state(data, population, toolbox, true_fitness_function)
+            if purturbation:
+                attempts = 0
+                attempt_limit = 100
+                while attempts < attempt_limit:
+                    attempts += 1
+                    mutant = toolbox.clone(population[0])
+                    mutant[:], flipped_indices = random_bit_flip(mutant, n_flips=2, exclude_indices=None)
+                    del mutant.fitness.values
+                    mutant.fitness.values = toolbox.evaluate(mutant)
+                    if tools.selBest([population[0], mutant], 1)[0] is mutant:
+                        population[0] = mutant
+                        flipped_indices = set()
+                        break
+                else: break
+            else: break
 
     return all_generations, best_solutions, best_fitnesses, true_fitnesses
 
@@ -511,7 +538,7 @@ problem_name = 'knapPI_2_100_1000_1'
 
 n_items, capacity, optimal, values, weights, items_dict = load_problem_KP(problem_name)
 
-print(n_items)
+# print(n_items)
 # n_items = 2
 # problem_name = f'OneMax_{n_items}_noise'
 
@@ -545,7 +572,7 @@ fitness_function = (eval_ind_kp, {'items_dict': items_dict, 'capacity': capacity
 HC_params = {
     'NGEN': 100000, # Number of generations
     # 'popsize': 100, # Population size
-    'tournsize': 10, # Tournament selection size
+    # 'tournsize': 10, # Tournament selection size
     'len_sol': n_items, # solution length
     'weights': (1.0,),
     'attr_function': attr_function,
@@ -556,7 +583,7 @@ HC_params = {
     # 'n_elite': 10
 }
 EA_params = {
-    'NGEN': 10000, # Number of generations
+    'NGEN': 1000, # Number of generations
     'popsize': 100, # Population size
     'tournsize': 10, # Tournament selection size
     'len_sol': n_items, # solution length
@@ -616,6 +643,7 @@ def run_algorithm(args):
 
 def conduct_runs_parallel(num_runs, algorithm_function, param_dict):
     """Conducts multiple algorithm runs in parallel."""
+
     # Prepare arguments for each run
     args = [(algorithm_function, param_dict) for _ in range(num_runs)]
 
@@ -633,31 +661,64 @@ def run_exp_parallel(algo, parameters, n_runs, problem_name, problem_info, suffi
     save_problem(problem_info, problem_name)
     print('Experiment Complete')
 
+    problem_names = [
+        'f1_l-d_kp_10_269',
+        'f2_l-d_kp_20_878',
+        'f3_l-d_kp_4_20',
+        'f4_l-d_kp_4_11',
+        'f5_l-d_kp_15_375',
+        'f6_l-d_kp_10_60',
+        'f7_l-d_kp_7_50',
+        'f8_l-d_kp_23_10000',
+        'f9_l-d_kp_5_80',
+        'f10_l-d_kp_20_879'
+    ]
+
 if __name__ == "__main__":
-    problem_name = 'knapPI_2_100_1000_1'
-    n_items, capacity, optimal, values, weights, items_dict = load_problem_KP(problem_name)
-    problem_info = {
-    'number of items': n_items,
-    'capcity': capacity,
-    'optimal': optimal,
-    'values': values,
-    'weights': weights
-    }
-    attr_function = (random.randint, 0, 1) # binary attribute function
-    mutate_function = (tools.mutFlipBit, {'indpb': 0.01})
-    fitness_function = (eval_ind_kp, {'items_dict': items_dict, 'capacity': capacity, 'penalty': 1})
-    HC_params = {
-    'NGEN': 100000, # Number of generations
-    # 'popsize': 100, # Population size
-    'tournsize': 10, # Tournament selection size
-    'len_sol': n_items, # solution length
-    'weights': (1.0,),
-    'attr_function': attr_function,
-    'mutate_function': mutate_function,
-    'fitness_function': fitness_function, # algorithm objective function
-    'starting_solution': None, # Specified starting solution for all individuals
-    'true_fitness_function': None, # noise-less fitness function for performance evaluation
-    # 'n_elite': 10
-    }
-    n_runs = 300
-    run_exp_parallel(HC, HC_params, n_runs, problem_name, problem_info, suffix='')
+    problem_names = [
+        'f1_l-d_kp_10_269',
+        'f2_l-d_kp_20_878',
+        'f3_l-d_kp_4_20',
+        # 'f4_l-d_kp_4_11',
+        # 'f5_l-d_kp_15_375',
+        # 'f6_l-d_kp_10_60',
+        # 'f7_l-d_kp_7_50',
+        # 'f8_l-d_kp_23_10000',
+        # 'f9_l-d_kp_5_80',
+        # 'f10_l-d_kp_20_879',
+        # 'knapPI_1_100_1000_1',
+        # 'knapPI_2_100_1000_1',
+        # 'knapPI_3_100_1000_1'
+    ]
+    for problem_name in problem_names:
+        n_items, capacity, optimal, values, weights, items_dict = load_problem_KP(problem_name)
+        # print(n_items)
+        # print(len(items_dict))
+        # print(problem_name)
+        # print(n_items)
+        problem_info = {
+        'number of items': n_items,
+        'capcity': capacity,
+        'optimal': optimal,
+        'values': values,
+        'weights': weights
+        }
+        attr_function = (random.randint, 0, 1) # binary attribute function
+        ss = generate_zero_solution(n_items)
+        mutate_function = (random_bit_flip, {'n_flips': 1})
+        fitness_function = (eval_ind_kp, {'items_dict': items_dict, 'capacity': capacity, 'penalty': 1})
+        HC_params = {
+            'NGEN': 10000, # Number of generations
+            # 'popsize': 100, # Population size
+            # 'tournsize': 10, # Tournament selection size
+            'len_sol': n_items, # solution length
+            'weights': (1.0,),
+            'attr_function': attr_function,
+            'mutate_function': mutate_function,
+            'fitness_function': fitness_function, # algorithm objective function
+            'starting_solution': None, # Specified starting solution for all individuals
+            'true_fitness_function': None, # noise-less fitness function for performance evaluation
+            # 'n_elite': 10
+        }
+        n_runs = 12*5
+        run_exp_parallel(HC, HC_params, n_runs, problem_name, problem_info, suffix='')
