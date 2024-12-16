@@ -18,8 +18,8 @@ def determine_optimisation_goal(all_trajectories_list):
         first_run = all_trajectories_list[0][0]  # Access the first trajectory
         starting_fitness = first_run[1][0]  # Initial fitness value
         ending_fitness = first_run[1][-1]  # Final fitness value
-        print(starting_fitness)
-        print(ending_fitness)
+        # print(starting_fitness)
+        # print(ending_fitness)
         return "min" if ending_fitness < starting_fitness else "max"
 
 algo_colors = ['blue', 'orange', 'purple', 'brown', 'cyan', 'magenta']
@@ -458,7 +458,7 @@ def update_plot(options, run_options, layout_value, hover_info_value, all_trajec
     for node, data in G.nodes(data=True):
         if data['fitness'] == overall_best_fitness:
             overall_best_node = node
-            print(overall_best_node)
+            # print(overall_best_node)
             break
 
     # Prepare node colors

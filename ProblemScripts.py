@@ -27,6 +27,14 @@ def load_problem_KP(filename, verbose=False):
     items_dict = {}
     for i in range(n_items):
         items_dict[i] = (values[i], weights[i])
+    
+    problem_info = {
+        'number of items': n_items,
+        'capcity': capacity,
+        'optimal': optimal,
+        'values': values,
+        'weights': weights
+        }
 
     # Print problem information
     if verbose:
@@ -37,4 +45,4 @@ def load_problem_KP(filename, verbose=False):
         print("optimal solution:", optimal)
 
     # Return problem data
-    return n_items, capacity, optimal, values, weights, items_dict
+    return n_items, capacity, optimal, values, weights, items_dict, problem_info
