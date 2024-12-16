@@ -35,6 +35,7 @@ def generate_zero_solution(length):
 #     return bit_list
 
 def random_bit_flip(bit_list, n_flips=1, exclude_indices=None):
+    # test_random_seed()
     # Ensure n_flips does not exceed the length of bit_list
     n_flips = min(n_flips, len(bit_list))
     
@@ -83,6 +84,8 @@ def eval_ind_kp(individual, items_dict, capacity, penalty=1):
     return (value,) # Not over capacity return value
 
 def rastrigin_eval(individual, amplitude=10):
+    # print(f"Evaluating individual: {individual}")
+    # print(f"Types in individual: {[type(x) for x in individual]}")
     A = amplitude
     n = len(individual)
     fitness = A * n + sum((x ** 2 - A * np.cos(2 * np.pi * x)) for x in individual),
@@ -111,6 +114,11 @@ def timestamp():
     datetime_stamp = now.strftime("%Y-%m-%d %H:%M:%S")
     return datetime_stamp
 
+def euclidean_distance(list1, list2):
+    if len(list1) != len(list2):
+        raise ValueError("Both lists must have the same length")
+    return np.sqrt(sum((x - y) ** 2 for x, y in zip(list1, list2)))
+
 # Algorithm functions
 # 1+1 HC
 def HC(NGEN, len_sol, weights, attr_function=None, mutate_function=None, purturbation=True, fitness_function=None, starting_solution=None, true_fitness_function=None):
@@ -135,11 +143,14 @@ def HC(NGEN, len_sol, weights, attr_function=None, mutate_function=None, purturb
     toolbox.register("population", tools.initRepeat, list, toolbox.individual)
     toolbox.register("evaluate", lambda ind: fitness_function[0](ind, **fitness_function[1]))
     # toolbox.register("mutate", lambda ind: mutate_function[0](ind, **mutate_function[1]))
-    toolbox.register("mutate", lambda ind, flipped_indices: mutate_function[0](ind, exclude_indices=flipped_indices, **mutate_function[1]))
     
     # Create population (1 for 1+1 EA)
     popsize = 1
     population = toolbox.population(n=popsize)
+
+    if all(isinstance(item, int) for item in population[0]): # check int or float
+        toolbox.register("mutate", lambda ind, flipped_indices: mutate_function[0](ind, exclude_indices=flipped_indices, **mutate_function[1]))
+    else: toolbox.register("mutate", lambda ind: mutate_function[0](ind, **mutate_function[1]))
 
     # If a starting solution is provided, set all individuals to that solution
     if starting_solution is not None:
@@ -157,13 +168,17 @@ def HC(NGEN, len_sol, weights, attr_function=None, mutate_function=None, purturb
 
     # Record initial population
     # record_population_state(data, population, toolbox, true_fitness_function)
+    if not all(isinstance(item, int) for item in population[0]):
+        record_population_state(data, population, toolbox, true_fitness_function)
     flipped_indices = set()
 
     # Evolutionary loop for each generation
     for gen in trange(NGEN, desc='Evolving EA Solutions'):
         # Generate a single mutant from the current solution
         mutant = toolbox.clone(population[0])
-        mutant[:], flipped_indices = toolbox.mutate(mutant, flipped_indices)
+        if all(isinstance(item, int) for item in mutant): # check int or float
+            mutant[:], flipped_indices = toolbox.mutate(mutant, flipped_indices)
+        else: mutant, = toolbox.mutate(mutant)
         del mutant.fitness.values  # Delete fitness to mark it as needing reevaluation
 
         # Evaluate the mutant
@@ -173,8 +188,12 @@ def HC(NGEN, len_sol, weights, attr_function=None, mutate_function=None, purturb
         if tools.selBest([population[0], mutant], 1)[0] is mutant:
             population[0] = mutant
             flipped_indices = set()
+            if not all(isinstance(item, int) for item in mutant):
+                record_population_state(data, population, toolbox, true_fitness_function)
+        
 
         # Record current population
+
         # record_population_state(data, population, toolbox, true_fitness_function)
 
         # Escape if all possible mutations applied with no improvement
@@ -186,7 +205,9 @@ def HC(NGEN, len_sol, weights, attr_function=None, mutate_function=None, purturb
                 while attempts < attempt_limit:
                     attempts += 1
                     mutant = toolbox.clone(population[0])
-                    mutant[:], flipped_indices = random_bit_flip(mutant, n_flips=2, exclude_indices=None)
+                    if all(isinstance(item, int) for item in mutant): # check int or float
+                        mutant[:], flipped_indices = random_bit_flip(mutant, n_flips=2, exclude_indices=None)
+                    else: mutant, = tools.mutGaussian(mutant, mu=0, sigma=0.2, indpb=0.5)
                     del mutant.fitness.values
                     mutant.fitness.values = toolbox.evaluate(mutant)
                     if tools.selBest([population[0], mutant], 1)[0] is mutant:
@@ -200,9 +221,9 @@ def HC(NGEN, len_sol, weights, attr_function=None, mutate_function=None, purturb
 
 
 # EA
-def EA(NGEN, popsize, tournsize, len_sol, weights, attr_function=None, mutate_function=None, fitness_function=None, starting_solution=None, true_fitness_function=None, n_elite=1, seed=None):
-    if seed is not None:
-        random.seed(seed)
+def EA(NGEN, popsize, tournsize, len_sol, weights, attr_function=None, mutate_function=None, fitness_function=None, starting_solution=None, true_fitness_function=None, n_elite=1):
+    # if seed is not None:
+    #     random.seed(seed)
     
     # Check if the fitness and individual creators have been defined; if not, define them
     if not hasattr(creator, "CustomFitness"):
@@ -539,9 +560,9 @@ def run_algorithm(args):
     algorithm_function, param_dict = args
 
     # Extract the unique run_index and use it to seed the random number generator
-    run_index = param_dict.pop("run_index", None)
+    # run_index = param_dict.pop("run_index", None)
 
-    all_generations, best_solutions, best_fitnesses, true_fitnesses = algorithm_function(seed=run_index, **param_dict)
+    all_generations, best_solutions, best_fitnesses, true_fitnesses = algorithm_function(**param_dict)
 
     # Extract trajectories and transitions
     unique_solutions, unique_fitnesses, solution_iterations = extract_trajectory_data(best_solutions, true_fitnesses)
@@ -551,8 +572,8 @@ def run_algorithm(args):
 
 def conduct_runs_parallel(num_runs, algorithm_function, param_dict):
     """Conducts multiple algorithm runs in parallel."""
-    # args = [(algorithm_function, param_dict) for _ in range(num_runs)]
-    args = [(algorithm_function, {**param_dict, "run_index": index}) for index in range(num_runs)]
+    args = [(algorithm_function, param_dict) for _ in range(num_runs)]
+    # args = [(algorithm_function, {**param_dict, "run_index": index}) for index in range(num_runs)]
 
     # Use ProcessPoolExecutor for parallel execution
     with ProcessPoolExecutor(max_workers=multiprocessing.cpu_count()) as executor:
@@ -623,23 +644,25 @@ def get_base_UMDA(attr_function, fitness_function, fit_weights, n_items):
     return UMDA_params
 
 problem_names = [
-        # 'f1_l-d_kp_10_269',
+        'f1_l-d_kp_10_269',
         'f2_l-d_kp_20_878',
-        # 'f3_l-d_kp_4_20',
+        'f3_l-d_kp_4_20',
         # 'f4_l-d_kp_4_11',
         # 'f5_l-d_kp_15_375',
         # 'f6_l-d_kp_10_60',
         # 'f7_l-d_kp_7_50',
-        # 'f8_l-d_kp_23_10000',
+        'f8_l-d_kp_23_10000',
         # 'f9_l-d_kp_5_80',
         # 'f10_l-d_kp_20_879',
-        # 'knapPI_1_100_1000_1',
-        # 'knapPI_2_100_1000_1',
-        # 'knapPI_3_100_1000_1'
+        'knapPI_1_100_1000_1',
+        'knapPI_2_100_1000_1',
+        'knapPI_3_100_1000_1'
     ]
 
 if __name__ == "__main__":
+    n_runs_HC = 120
     n_runs = 12
+
     # KP problems
     for problem_name in problem_names:
         # Load problem, fitness, operations
@@ -650,11 +673,30 @@ if __name__ == "__main__":
 
         HC_params = get_base_HC(binary_attribute, mutate_function, fitness_function, fit_weights, n_items)
         # run_exp(HC, HC_params, n_runs, problem_name, problem_info, suffix='') # single threaded
-        # run_exp_parallel(HC, HC_params, n_runs, problem_name, problem_info, suffix='') # multithreaded
+        run_exp_parallel(HC, HC_params, n_runs_HC, problem_name, problem_info, suffix='') # multithreaded
 
         UMDA_params = get_base_UMDA(binary_attribute, fitness_function, fit_weights, n_items)
-        # run_exp_parallel(UMDA, UMDA_params, n_runs, problem_name, problem_info, suffix='')
+        run_exp_parallel(UMDA, UMDA_params, n_runs, problem_name, problem_info, suffix='')
         
         EA_params = get_base_EA(binary_attribute, mutate_function, fitness_function, fit_weights, n_items)
         run_exp_parallel(EA, EA_params, n_runs, problem_name, problem_info, suffix='')
+    
+    # Rastrigin problem
+    problem_name = 'rastriginN2A10'
+    n_items = 2
+    mutate_function = (tools.mutGaussian, {'mu': 0, 'sigma': 0.1, 'indpb': 0.5})
+    fitness_function = (rastrigin_eval, {'amplitude':10})
+    fit_weights = (-1.0,)
+
+    HC_params = get_base_HC(Rastrigin_attribute, mutate_function, fitness_function, fit_weights, n_items)
+    run_exp_parallel(HC, HC_params, n_runs_HC, problem_name, problem_info, suffix='') # multithreaded
+
+    UMDA_params = get_base_UMDA(Rastrigin_attribute, fitness_function, fit_weights, n_items)
+    run_exp_parallel(UMDA, UMDA_params, n_runs, problem_name, problem_info, suffix='')
+    
+    EA_params = get_base_EA(Rastrigin_attribute, mutate_function, fitness_function, fit_weights, n_items)
+    run_exp_parallel(EA, EA_params, n_runs, problem_name, problem_info, suffix='')
+
+
+
 

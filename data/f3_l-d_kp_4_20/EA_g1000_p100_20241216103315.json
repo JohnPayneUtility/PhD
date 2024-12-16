@@ -1,0 +1,44 @@
+{
+    "NGEN": 1000,
+    "popsize": 100,
+    "tournsize": 10,
+    "len_sol": 4,
+    "weights": [
+        1.0
+    ],
+    "attr_function": "binary_attribute",
+    "mutate_function": [
+        "random_bit_flip",
+        {
+            "n_flips": 1
+        }
+    ],
+    "fitness_function": [
+        "eval_ind_kp",
+        {
+            "items_dict": {
+                "0": [
+                    9,
+                    6
+                ],
+                "1": [
+                    11,
+                    5
+                ],
+                "2": [
+                    13,
+                    9
+                ],
+                "3": [
+                    15,
+                    7
+                ]
+            },
+            "capacity": 20,
+            "penalty": 1
+        }
+    ],
+    "starting_solution": null,
+    "true_fitness_function": null,
+    "n_elite": 10
+}
