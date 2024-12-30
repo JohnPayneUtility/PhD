@@ -148,6 +148,11 @@ def HC(NGEN, len_sol, weights, attr_function=None, mutate_function=None, purturb
     popsize = 1
     population = toolbox.population(n=popsize)
 
+    if all(isinstance(item, int) for item in population[0]):
+        attr_type = int
+    else: attr_type = float
+    print(attr_type)
+
     if all(isinstance(item, int) for item in population[0]): # check int or float
         toolbox.register("mutate", lambda ind, flipped_indices: mutate_function[0](ind, exclude_indices=flipped_indices, **mutate_function[1]))
     else: toolbox.register("mutate", lambda ind: mutate_function[0](ind, **mutate_function[1]))
@@ -176,7 +181,7 @@ def HC(NGEN, len_sol, weights, attr_function=None, mutate_function=None, purturb
     for gen in trange(NGEN, desc='Evolving EA Solutions'):
         # Generate a single mutant from the current solution
         mutant = toolbox.clone(population[0])
-        if all(isinstance(item, int) for item in mutant): # check int or float
+        if attr_type == int: # check int or float
             mutant[:], flipped_indices = toolbox.mutate(mutant, flipped_indices)
         else: mutant, = toolbox.mutate(mutant)
         del mutant.fitness.values  # Delete fitness to mark it as needing reevaluation
@@ -205,7 +210,7 @@ def HC(NGEN, len_sol, weights, attr_function=None, mutate_function=None, purturb
                 while attempts < attempt_limit:
                     attempts += 1
                     mutant = toolbox.clone(population[0])
-                    if all(isinstance(item, int) for item in mutant): # check int or float
+                    if attr_type == int: # check int or float # check int or float
                         mutant[:], flipped_indices = random_bit_flip(mutant, n_flips=2, exclude_indices=None)
                     else: mutant, = tools.mutGaussian(mutant, mu=0, sigma=0.2, indpb=0.5)
                     del mutant.fitness.values
@@ -606,7 +611,7 @@ def get_base_HC(attr_function, mutate_function, fitness_function, fit_weights, n
         'attr_function': attr_function,
         'mutate_function': mutate_function,
         'fitness_function': fitness_function, # algorithm objective function
-        'starting_solution': None, # Specified starting solution for all individuals
+        'starting_solution': ss, # Specified starting solution for all individuals
         'true_fitness_function': None, # noise-less fitness function for performance evaluation
     }
     return HC_params
@@ -622,7 +627,7 @@ def get_base_EA(attr_function, mutate_function, fitness_function, fit_weights, n
     'attr_function': attr_function,
     'mutate_function': mutate_function,
     'fitness_function': fitness_function, # algorithm objective function
-    'starting_solution': None, # Specified starting solution for all individuals
+    'starting_solution': ss, # Specified starting solution for all individuals
     'true_fitness_function': None, # noise-less fitness function for performance evaluation
     'n_elite': 10
     }
@@ -644,19 +649,19 @@ def get_base_UMDA(attr_function, fitness_function, fit_weights, n_items):
     return UMDA_params
 
 problem_names = [
-        'f1_l-d_kp_10_269',
-        'f2_l-d_kp_20_878',
+        # 'f1_l-d_kp_10_269',
+        # 'f2_l-d_kp_20_878',
         'f3_l-d_kp_4_20',
         # 'f4_l-d_kp_4_11',
         # 'f5_l-d_kp_15_375',
         # 'f6_l-d_kp_10_60',
         # 'f7_l-d_kp_7_50',
-        'f8_l-d_kp_23_10000',
+        # 'f8_l-d_kp_23_10000',
         # 'f9_l-d_kp_5_80',
         # 'f10_l-d_kp_20_879',
-        'knapPI_1_100_1000_1',
-        'knapPI_2_100_1000_1',
-        'knapPI_3_100_1000_1'
+        # 'knapPI_1_100_1000_1',
+        # 'knapPI_2_100_1000_1',
+        # 'knapPI_3_100_1000_1'
     ]
 
 if __name__ == "__main__":
@@ -682,20 +687,20 @@ if __name__ == "__main__":
         run_exp_parallel(EA, EA_params, n_runs, problem_name, problem_info, suffix='')
     
     # Rastrigin problem
-    problem_name = 'rastriginN2A10'
-    n_items = 2
-    mutate_function = (tools.mutGaussian, {'mu': 0, 'sigma': 0.1, 'indpb': 0.5})
-    fitness_function = (rastrigin_eval, {'amplitude':10})
-    fit_weights = (-1.0,)
+    # problem_name = 'rastriginN2A10'
+    # n_items = 2
+    # mutate_function = (tools.mutGaussian, {'mu': 0, 'sigma': 0.1, 'indpb': 0.5})
+    # fitness_function = (rastrigin_eval, {'amplitude':10})
+    # fit_weights = (-1.0,)
 
-    HC_params = get_base_HC(Rastrigin_attribute, mutate_function, fitness_function, fit_weights, n_items)
-    run_exp_parallel(HC, HC_params, n_runs_HC, problem_name, problem_info, suffix='') # multithreaded
+    # HC_params = get_base_HC(Rastrigin_attribute, mutate_function, fitness_function, fit_weights, n_items)
+    # run_exp_parallel(HC, HC_params, n_runs_HC, problem_name, problem_info, suffix='') # multithreaded
 
-    UMDA_params = get_base_UMDA(Rastrigin_attribute, fitness_function, fit_weights, n_items)
-    run_exp_parallel(UMDA, UMDA_params, n_runs, problem_name, problem_info, suffix='')
+    # UMDA_params = get_base_UMDA(Rastrigin_attribute, fitness_function, fit_weights, n_items)
+    # run_exp_parallel(UMDA, UMDA_params, n_runs, problem_name, problem_info, suffix='')
     
-    EA_params = get_base_EA(Rastrigin_attribute, mutate_function, fitness_function, fit_weights, n_items)
-    run_exp_parallel(EA, EA_params, n_runs, problem_name, problem_info, suffix='')
+    # EA_params = get_base_EA(Rastrigin_attribute, mutate_function, fitness_function, fit_weights, n_items)
+    # run_exp_parallel(EA, EA_params, n_runs, problem_name, problem_info, suffix='')
 
 
 
