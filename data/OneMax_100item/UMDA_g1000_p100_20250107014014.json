@@ -1,0 +1,17 @@
+{
+    "NGEN": 1000,
+    "popsize": 100,
+    "selectsize": 50,
+    "len_sol": 100,
+    "weights": [
+        1.0
+    ],
+    "attr_function": "binary_attribute",
+    "mutate_function": null,
+    "fitness_function": [
+        "OneMax_fitness",
+        {}
+    ],
+    "starting_solution": null,
+    "true_fitness_function": null
+}

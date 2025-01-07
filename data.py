@@ -119,6 +119,9 @@ def euclidean_distance(list1, list2):
         raise ValueError("Both lists must have the same length")
     return np.sqrt(sum((x - y) ** 2 for x, y in zip(list1, list2)))
 
+def PCEA(NGEN, len_sol, weights, attr_function=None, mutate_function=None, purturbation=True, fitness_function=None, starting_solution=None, true_fitness_function=None):
+    return None
+
 # Algorithm functions
 # 1+1 HC
 def HC(NGEN, len_sol, weights, attr_function=None, mutate_function=None, purturbation=True, fitness_function=None, starting_solution=None, true_fitness_function=None):
@@ -148,10 +151,12 @@ def HC(NGEN, len_sol, weights, attr_function=None, mutate_function=None, purturb
     popsize = 1
     population = toolbox.population(n=popsize)
 
+    # print(population)
+    # print(population[0])
     if all(isinstance(item, int) for item in population[0]):
         attr_type = int
     else: attr_type = float
-    print(attr_type)
+    # print(attr_type)
 
     if all(isinstance(item, int) for item in population[0]): # check int or float
         toolbox.register("mutate", lambda ind, flipped_indices: mutate_function[0](ind, exclude_indices=flipped_indices, **mutate_function[1]))
@@ -651,12 +656,12 @@ def get_base_UMDA(attr_function, fitness_function, fit_weights, n_items):
 problem_names = [
         # 'f1_l-d_kp_10_269',
         # 'f2_l-d_kp_20_878',
-        'f3_l-d_kp_4_20',
+        # 'f3_l-d_kp_4_20',
         # 'f4_l-d_kp_4_11',
         # 'f5_l-d_kp_15_375',
         # 'f6_l-d_kp_10_60',
         # 'f7_l-d_kp_7_50',
-        # 'f8_l-d_kp_23_10000',
+        'f8_l-d_kp_23_10000',
         # 'f9_l-d_kp_5_80',
         # 'f10_l-d_kp_20_879',
         # 'knapPI_1_100_1000_1',
@@ -668,6 +673,25 @@ if __name__ == "__main__":
     n_runs_HC = 120
     n_runs = 12
 
+    # OneMax Problems
+    problem_name = 'OneMax_100item'
+    n_items = 100
+    mutate_function = (random_bit_flip, {'n_flips': 1})
+    fitness_function = (OneMax_fitness, {})
+    fit_weights = (1.0,)
+
+    problem_info = {'n_items': n_items}
+
+    HC_params = get_base_HC(binary_attribute, mutate_function, fitness_function, fit_weights, n_items)
+    run_exp(HC, HC_params, n_runs_HC, problem_name, problem_info, suffix='')
+
+    UMDA_params = get_base_UMDA(binary_attribute, fitness_function, fit_weights, n_items)
+    run_exp(UMDA, UMDA_params, n_runs, problem_name, problem_info, suffix='')
+    
+    EA_params = get_base_EA(binary_attribute, mutate_function, fitness_function, fit_weights, n_items)
+    run_exp(EA, EA_params, n_runs, problem_name, problem_info, suffix='')
+
+
     # KP problems
     for problem_name in problem_names:
         # Load problem, fitness, operations
@@ -678,13 +702,15 @@ if __name__ == "__main__":
 
         HC_params = get_base_HC(binary_attribute, mutate_function, fitness_function, fit_weights, n_items)
         # run_exp(HC, HC_params, n_runs, problem_name, problem_info, suffix='') # single threaded
-        run_exp_parallel(HC, HC_params, n_runs_HC, problem_name, problem_info, suffix='') # multithreaded
+        # run_exp_parallel(HC, HC_params, n_runs_HC, problem_name, problem_info, suffix='') # multithreaded
 
         UMDA_params = get_base_UMDA(binary_attribute, fitness_function, fit_weights, n_items)
-        run_exp_parallel(UMDA, UMDA_params, n_runs, problem_name, problem_info, suffix='')
+        # run_exp(UMDA, UMDA_params, n_runs, problem_name, problem_info, suffix='')
+        # run_exp_parallel(UMDA, UMDA_params, n_runs, problem_name, problem_info, suffix='')
         
         EA_params = get_base_EA(binary_attribute, mutate_function, fitness_function, fit_weights, n_items)
-        run_exp_parallel(EA, EA_params, n_runs, problem_name, problem_info, suffix='')
+        # run_exp(EA, EA_params, n_runs, problem_name, problem_info, suffix='')
+        # run_exp_parallel(EA, EA_params, n_runs, problem_name, problem_info, suffix='')
     
     # Rastrigin problem
     # problem_name = 'rastriginN2A10'
