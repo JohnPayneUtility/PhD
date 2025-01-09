@@ -61,6 +61,21 @@ def random_bit_flip(bit_list, n_flips=1, exclude_indices=None):
     
     return bit_list, flipped_indices
 
+def complementary_crossover(parent1, parent2):
+    assert len(parent1) == len(parent2), "Parents must have the same length."
+    
+    # Create empty offspring as lists
+    offspring1 = type(parent1)([])
+    offspring2 = type(parent2)([])
+    
+    # Generate the offspring
+    for x1, x2 in zip(parent1, parent2):
+        a = random.randint(0, 1)  # Randomly choose 0 or 1 with equal probability
+        offspring1.append(a * x1 + (1 - a) * x2)  # Xμ
+        offspring2.append((1 - a) * x1 + a * x2)  # X̄μ
+
+    return offspring1, offspring2
+
 def OneMax_fitness(individual, noise_function=None, noise_intensity=1):
     """ Function calculates fitness for OneMax problem individual """
     if noise_function is not None:
@@ -119,7 +134,31 @@ def euclidean_distance(list1, list2):
         raise ValueError("Both lists must have the same length")
     return np.sqrt(sum((x - y) ** 2 for x, y in zip(list1, list2)))
 
-def PCEA(len_sol, weights, popsize, gens=None, evals=None, target=None, attr_function=None, mutate_function=None, purturbation=True, fitness_function=None, starting_solution=None, true_fitness_function=None):
+def PCEA(len_sol, weights, popsize, gens=None, evals=None, target=None, attr_function=None, fitness_function=None, starting_solution=None, true_fitness_function=None):
+    """
+    This function implements PCEA as described in prugel-bennettRunTimeAnalysisPopulationBased2015
+    This is an population based EA that uses crossover without mutation
+
+    Args:
+        len_sol (int): length of solution
+        weights (tuple): fitness weights for multiobjective problems also informs optimisation goal
+        popsize (int): population size for EA
+
+        gens (int): limit on number of generations to run EA for
+        evals (int): limit on number of fitness evaluations to perform
+        target (int ot float): target fitness for early stopping condition
+
+        attr_function (callable): Returns solution attribute i.e. random.randint(0, 1) or random.uniform(-5.12, 5.12)
+        starting_solution (list[int or float]): Predefinied starting solution
+        fitness_function (callable): Returns potentially noisy fitness for given solution
+        true_fitness_function (callable): Returns non-noisy fitness for given solution
+    
+    Returns:
+        all_generations (list[list[list[int or float]]]): Contains a list of all solutions for each generation
+        best_solutions (list[list[int or float]]): A list containing best noisy solution for each generation
+        best_fitnesses (list[int or flaot]): A list containing noisy fitness of best solution for each generation
+        true_fitnesses (list[int or float]):A list containing true fitness of best solution for each generation
+    """
     # Fitness and individual creators
     if not hasattr(creator, "CustomFitness"):
         creator.create("CustomFitness", base.Fitness, weights=weights)
@@ -129,10 +168,8 @@ def PCEA(len_sol, weights, popsize, gens=None, evals=None, target=None, attr_fun
     # Check essential functions provided
     if attr_function is None:
         raise ValueError("Attribute generation function must be provided")
-    if mutate_function is None:
-        raise ValueError("Mutation function must be provided")
     
-    # Check eessential valuees provided
+    # Check essential valuees provided
     if gens is None and evals is None and target is None:
         raise ValueError("A stop condition must be provided i.e. gens, evals, target")
 
@@ -142,7 +179,8 @@ def PCEA(len_sol, weights, popsize, gens=None, evals=None, target=None, attr_fun
     toolbox.register("individual", tools.initRepeat, creator.Individual, toolbox.attribute, n=len_sol)
     toolbox.register("population", tools.initRepeat, list, toolbox.individual)
     toolbox.register("evaluate", lambda ind: fitness_function[0](ind, **fitness_function[1]))
-    toolbox.register("mate", tools.cxUniform, indpb=0.5) # PCEA uses uniform crossover without mutation to obtain new solutions
+    # toolbox.register("mate", tools.cxUniform, indpb=0.5) # PCEA uses uniform crossover without mutation to obtain new solutions
+    toolbox.register("mate", complementary_crossover)
 
     # Initialise population
     population = toolbox.population(n=popsize)
@@ -163,15 +201,16 @@ def PCEA(len_sol, weights, popsize, gens=None, evals=None, target=None, attr_fun
     record_population_state(data, population, toolbox, true_fitness_function)
 
     # Evolutionary loop for each generation
-    for gen in trange(gens, desc='Evolving EA Solutions'):
+    # for gen in trange(gens, desc='Evolving EA Solutions'):
+    for gen in range(10000000):
         offspring = []
         for _ in range(len(population)):
             parent1, parent2 = random.sample(population, 2)
             offspring1, offspring2 = toolbox.mate(parent1, parent2)
 
-            # Invalidate fitness to ensure reevaluation if needed
-            del offspring1.fitness.values
-            del offspring2.fitness.values
+            # Invalidate fitness to ensure re-evaluation if needed
+            # del offspring1.fitness.values
+            # del offspring2.fitness.values
 
             offspring1.fitness.values = toolbox.evaluate(offspring1)
             offspring2.fitness.values = toolbox.evaluate(offspring2)
@@ -184,11 +223,10 @@ def PCEA(len_sol, weights, popsize, gens=None, evals=None, target=None, attr_fun
                 offspring.append(offspring2)
 
         population[:] = offspring # replace population
-        # Re-evaluate population for data recording
-        for ind in population:
-            del ind.fitness.values
-            ind.fitness.values = toolbox.evaluate(ind)
         record_population_state(data, population, toolbox, true_fitness_function)
+
+        if evals is not None and runtime >= evals:
+            return all_generations, best_solutions, best_fitnesses, true_fitnesses
 
     return all_generations, best_solutions, best_fitnesses, true_fitnesses
 
@@ -598,7 +636,8 @@ def get_exp_name(function, parameters, suffix=''):
 
     now = datetime.now()
     timestamp = now.strftime("%Y%m%d%H%M%S")
-    gen = parameters['NGEN']
+    # gen = parameters['NGEN']
+    gen = 0
     if 'popsize' in parameters:
         pop = parameters['popsize']
     else: pop = 'NA'
@@ -691,6 +730,22 @@ def get_base_HC(attr_function, mutate_function, fitness_function, fit_weights, n
     }
     return HC_params
 
+def get_base_PCEA(attr_function, mutate_function, fitness_function, fit_weights, n_items):
+    ss = generate_zero_solution(n_items)
+    EA_params = {
+    'len_sol': n_items, # solution length
+    'weights': fit_weights,
+    'popsize': 100, # Population size
+    'gens': None, # generation limit
+    'evals': None, # fitness eval limit
+    'target': None, # stopping fitness
+    'attr_function': attr_function,
+    'fitness_function': fitness_function, # algorithm objective function
+    'starting_solution': None, # Specified starting solution for all individuals
+    'true_fitness_function': None # noise-less fitness function for performance evaluation
+    }
+    return EA_params
+
 def get_base_EA(attr_function, mutate_function, fitness_function, fit_weights, n_items):
     ss = generate_zero_solution(n_items)
     EA_params = {
@@ -741,7 +796,7 @@ problem_names = [
 
 if __name__ == "__main__":
     n_runs_HC = 120
-    n_runs = 12
+    n_runs = 10
 
     # OneMax Problems
     problem_name = 'OneMax_100item'
@@ -751,15 +806,26 @@ if __name__ == "__main__":
     fit_weights = (1.0,)
 
     problem_info = {'n_items': n_items}
-
-    HC_params = get_base_HC(binary_attribute, mutate_function, fitness_function, fit_weights, n_items)
-    run_exp(HC, HC_params, n_runs_HC, problem_name, problem_info, suffix='')
-
-    UMDA_params = get_base_UMDA(binary_attribute, fitness_function, fit_weights, n_items)
-    run_exp(UMDA, UMDA_params, n_runs, problem_name, problem_info, suffix='')
     
-    EA_params = get_base_EA(binary_attribute, mutate_function, fitness_function, fit_weights, n_items)
-    run_exp(EA, EA_params, n_runs, problem_name, problem_info, suffix='')
+    PCEA_popsize = int(10 * np.sqrt(n_items) * np.log10(n_items))
+    print(np.sqrt(n_items))
+    print(np.log(n_items))
+    print(PCEA_popsize)
+    evals = 100000
+
+    PCEA_params = get_base_PCEA(binary_attribute, mutate_function, fitness_function, fit_weights, n_items)
+    PCEA_params['popsize'] = PCEA_popsize
+    PCEA_params['evals'] = evals
+    run_exp(PCEA, PCEA_params, n_runs, problem_name, problem_info, suffix='')
+
+    # HC_params = get_base_HC(binary_attribute, mutate_function, fitness_function, fit_weights, n_items)
+    # run_exp(HC, HC_params, n_runs_HC, problem_name, problem_info, suffix='')
+
+    # UMDA_params = get_base_UMDA(binary_attribute, fitness_function, fit_weights, n_items)
+    # run_exp(UMDA, UMDA_params, n_runs, problem_name, problem_info, suffix='')
+    
+    # EA_params = get_base_EA(binary_attribute, mutate_function, fitness_function, fit_weights, n_items)
+    # run_exp(EA, EA_params, n_runs, problem_name, problem_info, suffix='')
 
 
     # KP problems
