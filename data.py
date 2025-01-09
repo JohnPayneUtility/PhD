@@ -119,8 +119,78 @@ def euclidean_distance(list1, list2):
         raise ValueError("Both lists must have the same length")
     return np.sqrt(sum((x - y) ** 2 for x, y in zip(list1, list2)))
 
-def PCEA(NGEN, len_sol, weights, attr_function=None, mutate_function=None, purturbation=True, fitness_function=None, starting_solution=None, true_fitness_function=None):
-    return None
+def PCEA(len_sol, weights, popsize, gens=None, evals=None, target=None, attr_function=None, mutate_function=None, purturbation=True, fitness_function=None, starting_solution=None, true_fitness_function=None):
+    # Fitness and individual creators
+    if not hasattr(creator, "CustomFitness"):
+        creator.create("CustomFitness", base.Fitness, weights=weights)
+    if not hasattr(creator, "Individual"):
+        creator.create("Individual", list, fitness=creator.CustomFitness)
+    
+    # Check essential functions provided
+    if attr_function is None:
+        raise ValueError("Attribute generation function must be provided")
+    if mutate_function is None:
+        raise ValueError("Mutation function must be provided")
+    
+    # Check eessential valuees provided
+    if gens is None and evals is None and target is None:
+        raise ValueError("A stop condition must be provided i.e. gens, evals, target")
+
+    # Register toolbox
+    toolbox = base.Toolbox()
+    toolbox.register("attribute", attr_function)
+    toolbox.register("individual", tools.initRepeat, creator.Individual, toolbox.attribute, n=len_sol)
+    toolbox.register("population", tools.initRepeat, list, toolbox.individual)
+    toolbox.register("evaluate", lambda ind: fitness_function[0](ind, **fitness_function[1]))
+    toolbox.register("mate", tools.cxUniform, indpb=0.5) # PCEA uses uniform crossover without mutation to obtain new solutions
+
+    # Initialise population
+    population = toolbox.population(n=popsize)
+    if starting_solution is not None:
+        for ind in population:
+            ind[:] = starting_solution[:]
+
+    # Evaluate the initial population
+    fitnesses = list(map(toolbox.evaluate, population))
+    for ind, fit in zip(population, fitnesses):
+        ind.fitness.values = fit
+    runtime = popsize
+    
+    # Initialise data recording
+    all_generations, best_solutions, best_fitnesses, true_fitnesses = ([] for _ in range(4))
+    data = [all_generations, best_solutions, best_fitnesses, true_fitnesses]
+    # Record initial population
+    record_population_state(data, population, toolbox, true_fitness_function)
+
+    # Evolutionary loop for each generation
+    for gen in trange(gens, desc='Evolving EA Solutions'):
+        offspring = []
+        for _ in range(len(population)):
+            parent1, parent2 = random.sample(population, 2)
+            offspring1, offspring2 = toolbox.mate(parent1, parent2)
+
+            # Invalidate fitness to ensure reevaluation if needed
+            del offspring1.fitness.values
+            del offspring2.fitness.values
+
+            offspring1.fitness.values = toolbox.evaluate(offspring1)
+            offspring2.fitness.values = toolbox.evaluate(offspring2)
+            runtime += 2
+
+            # Select the fitter offspring and add to new population
+            if offspring1.fitness.values[0] > offspring2.fitness.values[0]:  # Adjust for minimization
+                offspring.append(offspring1)
+            else:
+                offspring.append(offspring2)
+
+        population[:] = offspring # replace population
+        # Re-evaluate population for data recording
+        for ind in population:
+            del ind.fitness.values
+            ind.fitness.values = toolbox.evaluate(ind)
+        record_population_state(data, population, toolbox, true_fitness_function)
+
+    return all_generations, best_solutions, best_fitnesses, true_fitnesses
 
 # Algorithm functions
 # 1+1 HC
