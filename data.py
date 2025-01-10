@@ -71,16 +71,18 @@ def complementary_crossover(parent1, parent2):
     # Generate the offspring
     for x1, x2 in zip(parent1, parent2):
         a = random.randint(0, 1)  # Randomly choose 0 or 1 with equal probability
-        offspring1.append(a * x1 + (1 - a) * x2)  # Xμ
-        offspring2.append((1 - a) * x1 + a * x2)  # X̄μ
+        offspring1.append(a * x1 + (1 - a) * x2)
+        offspring2.append((1 - a) * x1 + a * x2)
 
     return offspring1, offspring2
 
-def OneMax_fitness(individual, noise_function=None, noise_intensity=1):
+def OneMax_fitness(individual, noise_function=None, noise_intensity=0):
     """ Function calculates fitness for OneMax problem individual """
-    if noise_function is not None:
+    if noise_function is not None: # Provide noise function for noise applied to individual
         individual = noise_function(individual[:], noise_intensity)
-    fitness = sum(individual)
+        fitness = sum(individual)
+    else: # standard noisy
+        fitness = sum(individual) + random.gauss(0, noise_intensity)
     return (fitness,)
 
 def eval_ind_kp(individual, items_dict, capacity, penalty=1):
