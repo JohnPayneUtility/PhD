@@ -197,7 +197,6 @@ def PCEA(len_sol, weights, popsize, gens=None, evals=None, target=None, attr_fun
     # Initialise data recording
     all_generations, best_solutions, best_fitnesses, true_fitnesses = ([] for _ in range(4))
     data = [all_generations, best_solutions, best_fitnesses, true_fitnesses]
-    # Record initial population
     record_population_state(data, population, toolbox, true_fitness_function)
 
     # Evolutionary loop for each generation
@@ -233,6 +232,9 @@ def PCEA(len_sol, weights, popsize, gens=None, evals=None, target=None, attr_fun
 # Algorithm functions
 # 1+1 HC
 def HC(NGEN, len_sol, weights, attr_function=None, mutate_function=None, purturbation=True, fitness_function=None, starting_solution=None, true_fitness_function=None):
+    """
+    
+    """
     # Fitness and individual creators
     if not hasattr(creator, "CustomFitness"):
         creator.create("CustomFitness", base.Fitness, weights=weights)
@@ -339,10 +341,10 @@ def HC(NGEN, len_sol, weights, attr_function=None, mutate_function=None, purturb
 
 
 # EA
-def EA(NGEN, popsize, tournsize, len_sol, weights, attr_function=None, mutate_function=None, fitness_function=None, starting_solution=None, true_fitness_function=None, n_elite=1):
-    # if seed is not None:
-    #     random.seed(seed)
+def EA(len_sol, weights, popsize, gens=None, evals=None, target=None, attr_function=None, tournsize=2, mutate_function=None, fitness_function=None, starting_solution=None, true_fitness_function=None, n_elite=0):
+    """
     
+    """    
     # Check if the fitness and individual creators have been defined; if not, define them
     if not hasattr(creator, "CustomFitness"):
         creator.create("CustomFitness", base.Fitness, weights=weights)
@@ -375,28 +377,29 @@ def EA(NGEN, popsize, tournsize, len_sol, weights, attr_function=None, mutate_fu
     # Evaluate the initial population
     fitnesses = list(map(toolbox.evaluate, population))
     for ind, fit in zip(population, fitnesses):
-        # print(fit)
         ind.fitness.values = fit
+    runtime = popsize
 
     # Initialise data recording
     all_generations, best_solutions, best_fitnesses, true_fitnesses = ([] for _ in range(4))
     data = [all_generations, best_solutions, best_fitnesses, true_fitnesses]
-
-    # Record initial population
     record_population_state(data, population, toolbox, true_fitness_function)
 
     # Evolutionary loop for each generation
-    for gen in trange(NGEN, desc='Evolving EA Solutions'):
-        # Select the best individuals from the current population to keep (elitism)
-        # print(f"Generation {gen}: Best Fitness Before Elitism: {max(ind.fitness.values[0] for ind in population)}")
-        elites = [toolbox.clone(ind) for ind in tools.selBest(population, n_elite)]
-        # print(f"Elites Fitness: {[ind.fitness.values[0] for ind in elites]}")
+    # for gen in trange(NGEN, desc='Evolving EA Solutions'):
+    gen = 0
+    while gen < gens:
+        gen += 1
+        # Select the best individuals from the current population to keep (elitism) if enabled
+        if n_elite > 0:
+            elites = [toolbox.clone(ind) for ind in tools.selBest(population, n_elite)]
 
         # Select the offspring using tournament selection (cloning to avoid modifying the original individuals)
         n_offspring = popsize - n_elite
         offspring = [toolbox.clone(toolbox.select(population, 1)[0]) for _ in range(n_offspring)]
+        runtime += n_offspring
 
-        # Apply mutation on the offspring with probability MUTPB
+        # Apply mutation to offspring
         for mutant in offspring:
             toolbox.mutate(mutant)  # Mutate the individual
             del mutant.fitness.values  # Delete fitness to mark it as needing reevaluation
@@ -408,10 +411,15 @@ def EA(NGEN, popsize, tournsize, len_sol, weights, attr_function=None, mutate_fu
             ind.fitness.values = fit
 
         # Create the new population by combining elites and offspring
-        population = elites + offspring
+        if n_elite > 0:
+            population = elites + offspring 
+        else: population = offspring
 
         # Record current population
         record_population_state(data, population, toolbox, true_fitness_function)
+
+        if evals is not None and runtime >= evals:
+            return all_generations, best_solutions, best_fitnesses, true_fitnesses
 
     return all_generations, best_solutions, best_fitnesses, true_fitnesses
 
@@ -749,17 +757,19 @@ def get_base_PCEA(attr_function, mutate_function, fitness_function, fit_weights,
 def get_base_EA(attr_function, mutate_function, fitness_function, fit_weights, n_items):
     ss = generate_zero_solution(n_items)
     EA_params = {
-    'NGEN': 1000, # Number of generations
-    'popsize': 100, # Population size
-    'tournsize': 10, # Tournament selection size
     'len_sol': n_items, # solution length
     'weights': fit_weights,
+    'popsize': 100, # Population size
+    'gens': 1000000, # generation limit
+    'evals': None, # fitness eval limit
+    'target': None, # stopping fitness
     'attr_function': attr_function,
+    'tournsize': 2, # Tournament selection size
     'mutate_function': mutate_function,
     'fitness_function': fitness_function, # algorithm objective function
     'starting_solution': ss, # Specified starting solution for all individuals
     'true_fitness_function': None, # noise-less fitness function for performance evaluation
-    'n_elite': 10
+    'n_elite': 0
     }
     return EA_params
 
@@ -801,17 +811,22 @@ if __name__ == "__main__":
     # OneMax Problems
     problem_name = 'OneMax_100item'
     n_items = 100
-    mutate_function = (random_bit_flip, {'n_flips': 1})
+    noise_stdev = 0
+    # mutate_function = (random_bit_flip, {'n_flips': 1})
+    selection_pressure_parameter = 0.1
+    mutation_rate = selection_pressure_parameter / (3 * n_items * max(1, noise_stdev))
+    mutate_function = (tools.mutFlipBit, {'indpb': mutation_rate})
     fitness_function = (OneMax_fitness, {})
     fit_weights = (1.0,)
 
     problem_info = {'n_items': n_items}
     
-    PCEA_popsize = int(10 * np.sqrt(n_items) * np.log10(n_items))
-    print(np.sqrt(n_items))
-    print(np.log(n_items))
-    print(PCEA_popsize)
-    evals = 100000
+    PCEA_popsize = int(max(1, noise_stdev) * np.sqrt(n_items) * np.log(n_items))
+    mutEA_popsize = int(10 * np.log(n_items))
+    # print(np.sqrt(n_items))
+    # print(np.log(n_items))
+    # print(PCEA_popsize)
+    evals = 30000
 
     PCEA_params = get_base_PCEA(binary_attribute, mutate_function, fitness_function, fit_weights, n_items)
     PCEA_params['popsize'] = PCEA_popsize
@@ -824,8 +839,11 @@ if __name__ == "__main__":
     # UMDA_params = get_base_UMDA(binary_attribute, fitness_function, fit_weights, n_items)
     # run_exp(UMDA, UMDA_params, n_runs, problem_name, problem_info, suffix='')
     
-    # EA_params = get_base_EA(binary_attribute, mutate_function, fitness_function, fit_weights, n_items)
-    # run_exp(EA, EA_params, n_runs, problem_name, problem_info, suffix='')
+    EA_params = get_base_EA(binary_attribute, mutate_function, fitness_function, fit_weights, n_items)
+    EA_params['popsize'] = mutEA_popsize
+    # EA_params['n_elite'] = int(mutEA_popsize/10)
+    EA_params['evals'] = evals
+    run_exp(EA, EA_params, n_runs, problem_name, problem_info, suffix='')
 
 
     # KP problems
