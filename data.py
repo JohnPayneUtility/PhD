@@ -203,7 +203,9 @@ def PCEA(len_sol, weights, popsize, gens=None, evals=None, target=None, attr_fun
 
     # Evolutionary loop for each generation
     # for gen in trange(gens, desc='Evolving EA Solutions'):
-    for gen in range(10000000):
+    gen = 0
+    while gen < gens:
+        gen += 1
         offspring = []
         for _ in range(len(population)):
             parent1, parent2 = random.sample(population, 2)
@@ -341,6 +343,72 @@ def HC(NGEN, len_sol, weights, attr_function=None, mutate_function=None, purturb
 
     return all_generations, best_solutions, best_fitnesses, true_fitnesses
 
+def OnePlusOneEA(len_sol, weights, gens=None, evals=None, target=None, attr_function=None, mutate_function=None, fitness_function=None, starting_solution=None, true_fitness_function=None):
+    """
+    
+    """
+    # Fitness and individual creators
+    if not hasattr(creator, "CustomFitness"):
+        creator.create("CustomFitness", base.Fitness, weights=weights)
+    if not hasattr(creator, "Individual"):
+        creator.create("Individual", list, fitness=creator.CustomFitness)
+    
+    # Check essential functions provided
+    if attr_function is None:
+        raise ValueError("Attribute generation function must be provided")
+    if mutate_function is None:
+        raise ValueError("Mutation function must be provided")
+
+    # Define toolbox
+    toolbox = base.Toolbox()
+    toolbox.register("attribute", attr_function)
+    toolbox.register("individual", tools.initRepeat, creator.Individual, toolbox.attribute, n=len_sol)
+    toolbox.register("population", tools.initRepeat, list, toolbox.individual)
+    toolbox.register("evaluate", lambda ind: fitness_function[0](ind, **fitness_function[1]))
+    toolbox.register("mutate", lambda ind: mutate_function[0](ind, **mutate_function[1]))
+    
+    # Create population (1 for 1+1 EA)
+    popsize = 1
+    population = toolbox.population(n=popsize)
+
+    # If a starting solution is provided, set all individuals to that solution
+    if starting_solution is not None:
+        for ind in population:
+            ind[:] = starting_solution[:]
+
+    # Evaluate the initial population
+    fitnesses = list(map(toolbox.evaluate, population))
+    for ind, fit in zip(population, fitnesses):
+        ind.fitness.values = fit
+    runtime = popsize
+
+    # Initialise data recording
+    all_generations, best_solutions, best_fitnesses, true_fitnesses = ([] for _ in range(4))
+    data = [all_generations, best_solutions, best_fitnesses, true_fitnesses]
+    record_population_state(data, population, toolbox, true_fitness_function)
+
+    # Evolutionary loop for each generation
+    gen = 0
+    while gen < gens:
+        gen += 1
+        # Generate a single mutant from the current solution
+        mutant = toolbox.clone(population[0])
+        mutant, = toolbox.mutate(mutant)
+
+        del mutant.fitness.values  # Delete fitness to mark it as needing reevaluation
+        mutant.fitness.values = toolbox.evaluate(mutant)
+        runtime += 1
+
+        # Replace the current solution with the mutant if it is better
+        if tools.selBest([population[0], mutant], 1)[0] is mutant:
+            population[0] = mutant
+            record_population_state(data, population, toolbox, true_fitness_function)
+        
+        if evals is not None and runtime >= evals:
+            return all_generations, best_solutions, best_fitnesses, true_fitnesses
+
+    return all_generations, best_solutions, best_fitnesses, true_fitnesses
+
 
 # EA
 def EA(len_sol, weights, popsize, gens=None, evals=None, target=None, attr_function=None, tournsize=2, mutate_function=None, fitness_function=None, starting_solution=None, true_fitness_function=None, n_elite=0):
@@ -460,7 +528,7 @@ def umda_update_full(len_sol, population, pop_size, select_size, toolbox):
     
     return new_solutions
 
-def UMDA(NGEN, popsize, selectsize, len_sol, weights, attr_function=None, mutate_function=None, fitness_function=None, starting_solution=None, true_fitness_function=None):
+def UMDA(len_sol, weights, popsize, selectsize, gens=None, evals=None, target=None, attr_function=None, fitness_function=None, starting_solution=None, true_fitness_function=None):
     # Check if the fitness and individual creators have been defined; if not, define them
     if not hasattr(creator, "CustomFitness"):
         creator.create("CustomFitness", base.Fitness, weights=weights)
@@ -490,6 +558,7 @@ def UMDA(NGEN, popsize, selectsize, len_sol, weights, attr_function=None, mutate
     fitnesses = list(map(toolbox.evaluate, population))
     for ind, fit in zip(population, fitnesses):
         ind.fitness.values = fit
+    runtime = popsize
 
     # Initialise data to record every generation's population, best solutions, best fitness values, and true fitness values
     all_generations, best_solutions, best_fitnesses, true_fitnesses = ([] for _ in range(4))
@@ -499,15 +568,23 @@ def UMDA(NGEN, popsize, selectsize, len_sol, weights, attr_function=None, mutate
     record_population_state(data, population, toolbox, true_fitness_function)
 
     # Evolutionary loop
-    for gen in trange(NGEN, desc='Evolving UMDA solution'):
+    gen = 0
+    # for gen in trange(NGEN, desc='Evolving UMDA solution'):
+    while gen < gens:
+        gen += 1
+        # update population
         population = umda_update_full(len_sol, population, popsize, selectsize, toolbox)
 
         fitnesses = list(map(toolbox.evaluate, population))
         for ind, fit in zip(population, fitnesses):
             ind.fitness.values = fit
+        runtime += popsize
 
         # Record current population
         record_population_state(data, population, toolbox, true_fitness_function)
+
+        if evals is not None and runtime >= evals:
+            return all_generations, best_solutions, best_fitnesses, true_fitnesses
 
     return all_generations, best_solutions, best_fitnesses, true_fitnesses
 
@@ -726,7 +803,7 @@ def binary_attribute():
 def Rastrigin_attribute():
     return random.uniform(-5.12, 5.12)
 
-def get_base_HC(attr_function, mutate_function, fitness_function, fit_weights, n_items):
+def get_base_HC(attr_function, mutate_function, fitness_function, true_fitness_function, fit_weights, n_items):
     ss = generate_zero_solution(n_items)
     HC_params = {
         'NGEN': 10000, # Number of generations
@@ -736,27 +813,43 @@ def get_base_HC(attr_function, mutate_function, fitness_function, fit_weights, n
         'mutate_function': mutate_function,
         'fitness_function': fitness_function, # algorithm objective function
         'starting_solution': ss, # Specified starting solution for all individuals
-        'true_fitness_function': None, # noise-less fitness function for performance evaluation
+        'true_fitness_function': true_fitness_function, # noise-less fitness function for performance evaluation
     }
     return HC_params
 
-def get_base_PCEA(attr_function, mutate_function, fitness_function, fit_weights, n_items):
+def get_base_OnePlusOneEA(attr_function, mutate_function, fitness_function, true_fitness_function, fit_weights, n_items):
+    ss = generate_zero_solution(n_items)
+    HC_params = {
+        'len_sol': n_items, # solution length
+        'weights': fit_weights,
+        'gens': 1000000, # generation limit
+        'evals': None, # fitness eval limit
+        'target': None, # stopping fitness
+        'attr_function': attr_function,
+        'mutate_function': mutate_function,
+        'fitness_function': fitness_function, # algorithm objective function
+        'starting_solution': ss, # Specified starting solution for all individuals
+        'true_fitness_function': true_fitness_function, # noise-less fitness function for performance evaluation
+    }
+    return HC_params
+
+def get_base_PCEA(attr_function, fitness_function, true_fitness_function, fit_weights, n_items):
     ss = generate_zero_solution(n_items)
     EA_params = {
     'len_sol': n_items, # solution length
     'weights': fit_weights,
     'popsize': 100, # Population size
-    'gens': None, # generation limit
+    'gens': 1000000, # generation limit
     'evals': None, # fitness eval limit
     'target': None, # stopping fitness
     'attr_function': attr_function,
     'fitness_function': fitness_function, # algorithm objective function
     'starting_solution': None, # Specified starting solution for all individuals
-    'true_fitness_function': None # noise-less fitness function for performance evaluation
+    'true_fitness_function': true_fitness_function # noise-less fitness function for performance evaluation
     }
     return EA_params
 
-def get_base_EA(attr_function, mutate_function, fitness_function, fit_weights, n_items):
+def get_base_EA(attr_function, mutate_function, fitness_function, true_fitness_function, fit_weights, n_items):
     ss = generate_zero_solution(n_items)
     EA_params = {
     'len_sol': n_items, # solution length
@@ -770,23 +863,24 @@ def get_base_EA(attr_function, mutate_function, fitness_function, fit_weights, n
     'mutate_function': mutate_function,
     'fitness_function': fitness_function, # algorithm objective function
     'starting_solution': ss, # Specified starting solution for all individuals
-    'true_fitness_function': None, # noise-less fitness function for performance evaluation
+    'true_fitness_function': true_fitness_function, # noise-less fitness function for performance evaluation
     'n_elite': 0
     }
     return EA_params
 
-def get_base_UMDA(attr_function, fitness_function, fit_weights, n_items):
+def get_base_UMDA(attr_function, fitness_function, true_fitness_function, fit_weights, n_items):
     UMDA_params = {
-    'NGEN': 1000, # Number of generations
-    'popsize': 100, # Population size
-    'selectsize': 50, # Size selected for distribution
     'len_sol': n_items, # solution length
     'weights': fit_weights,
+    'popsize': 100, # Population size
+    'gens': 1000000, # generation limit
+    'evals': None, # fitness eval limit
+    'target': None, # stopping fitness
     'attr_function': attr_function,
-    'mutate_function': None,
+    'selectsize': 50, # Size selected for distribution
     'fitness_function': fitness_function, # algorithm objective function
     'starting_solution': None, # Specified starting solution for all individuals
-    'true_fitness_function': None, # noise-less fitness function for performance evaluation
+    'true_fitness_function': true_fitness_function, # noise-less fitness function for performance evaluation
     }
     return UMDA_params
 
@@ -806,46 +900,69 @@ problem_names = [
         # 'knapPI_3_100_1000_1'
     ]
 
-if __name__ == "__main__":
+if __name__ == "__main__":    
     n_runs_HC = 120
-    n_runs = 10
+    n_runs = 3
+
 
     # OneMax Problems
+    # Problem setup
     problem_name = 'OneMax_100item'
     n_items = 100
-    noise_stdev = 0
-    # mutate_function = (random_bit_flip, {'n_flips': 1})
-    selection_pressure_parameter = 0.1
-    mutation_rate = selection_pressure_parameter / (3 * n_items * max(1, noise_stdev))
-    mutate_function = (tools.mutFlipBit, {'indpb': mutation_rate})
-    fitness_function = (OneMax_fitness, {})
     fit_weights = (1.0,)
 
-    problem_info = {'n_items': n_items}
-    
-    PCEA_popsize = int(max(1, noise_stdev) * np.sqrt(n_items) * np.log(n_items))
-    mutEA_popsize = int(10 * np.log(n_items))
-    # print(np.sqrt(n_items))
-    # print(np.log(n_items))
-    # print(PCEA_popsize)
-    evals = 30000
+    OneMaxEvals = [38392, 41066, 44477, 50728, 56851, 64079, 70736, 79034, 86078, 93638]
+    OneMaxEvalsWithZero = [38392] + OneMaxEvals
+    noise_stdev = 0
+    num_noise_values = 10
+    noise_values = list(np.linspace(2, int(np.sqrt(n_items)), num=num_noise_values, dtype=int))
+    noise_values_with_zero = [0] + noise_values
 
-    PCEA_params = get_base_PCEA(binary_attribute, mutate_function, fitness_function, fit_weights, n_items)
-    PCEA_params['popsize'] = PCEA_popsize
-    PCEA_params['evals'] = evals
-    run_exp(PCEA, PCEA_params, n_runs, problem_name, problem_info, suffix='')
+    for evalLimit, noisevalue in zip(OneMaxEvalsWithZero, noise_values_with_zero):
 
-    # HC_params = get_base_HC(binary_attribute, mutate_function, fitness_function, fit_weights, n_items)
-    # run_exp(HC, HC_params, n_runs_HC, problem_name, problem_info, suffix='')
+        # mutate_function = (random_bit_flip, {'n_flips': 1})
+        # selection_pressure_parameter = 0.1
+        # selection_pressure_parameter = 3
+        # mutation_rate = selection_pressure_parameter / (3 * n_items * max(1, noisevalue))
+        mutation_rate = 1 / (n_items)
 
-    # UMDA_params = get_base_UMDA(binary_attribute, fitness_function, fit_weights, n_items)
-    # run_exp(UMDA, UMDA_params, n_runs, problem_name, problem_info, suffix='')
-    
-    EA_params = get_base_EA(binary_attribute, mutate_function, fitness_function, fit_weights, n_items)
-    EA_params['popsize'] = mutEA_popsize
-    # EA_params['n_elite'] = int(mutEA_popsize/10)
-    EA_params['evals'] = evals
-    run_exp(EA, EA_params, n_runs, problem_name, problem_info, suffix='')
+        mutate_function = (tools.mutFlipBit, {'indpb': mutation_rate})
+        fitness_function = (OneMax_fitness, {'noise_intensity': noisevalue})
+        true_fitness_function = (OneMax_fitness, {'noise_intensity': 0})
+
+        problem_info = {'n_items': n_items}
+        
+        PCEA_popsize = int(10 * np.sqrt(n_items) * np.log(n_items))
+        mutEA_popsize = int(max(1, noisevalue**2) * np.log(n_items))
+        UMDA_popsize = int(20 * np.sqrt(n_items) * np.log(n_items))
+
+
+        # Run PCEA
+        PCEA_params = get_base_PCEA(binary_attribute, fitness_function, true_fitness_function, fit_weights, n_items)
+        PCEA_params['popsize'] = PCEA_popsize
+        PCEA_params['evals'] = evalLimit
+        # run_exp(PCEA, PCEA_params, n_runs, problem_name, problem_info, suffix='')
+
+        # HC_params = get_base_HC(binary_attribute, mutate_function, fitness_function, fit_weights, n_items)
+        # run_exp(HC, HC_params, n_runs_HC, problem_name, problem_info, suffix='')
+
+        # Run UMDA
+        UMDA_params = get_base_UMDA(binary_attribute, fitness_function, true_fitness_function, fit_weights, n_items)
+        UMDA_params['popsize'] = UMDA_popsize
+        UMDA_params['evals'] = evalLimit
+        # run_exp(UMDA, UMDA_params, n_runs, problem_name, problem_info, suffix='')
+        
+        # Run 1+1 EA
+        OnePlusOneParams = get_base_OnePlusOneEA(binary_attribute, mutate_function, fitness_function, true_fitness_function, fit_weights, n_items)
+        OnePlusOneParams['evals'] = evalLimit
+        run_exp(OnePlusOneEA, OnePlusOneParams, n_runs, problem_name, problem_info, suffix='')
+
+        # Run Mutation population
+        EA_params = get_base_EA(binary_attribute, mutate_function, fitness_function, true_fitness_function, fit_weights, n_items)
+        EA_params['popsize'] = mutEA_popsize
+        # EA_params['n_elite'] = int(mutEA_popsize/10)
+        EA_params['evals'] = evalLimit
+        # run_exp(EA, EA_params, n_runs, problem_name, problem_info, suffix='')
 
 
     # KP problems
@@ -856,15 +973,15 @@ if __name__ == "__main__":
         fitness_function = (eval_ind_kp, {'items_dict': items_dict, 'capacity': capacity, 'penalty': 1})
         mutate_function = (random_bit_flip, {'n_flips': 1})
 
-        HC_params = get_base_HC(binary_attribute, mutate_function, fitness_function, fit_weights, n_items)
+        HC_params = get_base_HC(binary_attribute, mutate_function, fitness_function, true_fitness_function, fit_weights, n_items)
         # run_exp(HC, HC_params, n_runs, problem_name, problem_info, suffix='') # single threaded
         # run_exp_parallel(HC, HC_params, n_runs_HC, problem_name, problem_info, suffix='') # multithreaded
 
-        UMDA_params = get_base_UMDA(binary_attribute, fitness_function, fit_weights, n_items)
+        UMDA_params = get_base_UMDA(binary_attribute, fitness_function, true_fitness_function, fit_weights, n_items)
         # run_exp(UMDA, UMDA_params, n_runs, problem_name, problem_info, suffix='')
         # run_exp_parallel(UMDA, UMDA_params, n_runs, problem_name, problem_info, suffix='')
         
-        EA_params = get_base_EA(binary_attribute, mutate_function, fitness_function, fit_weights, n_items)
+        EA_params = get_base_EA(binary_attribute, mutate_function, fitness_function, true_fitness_function, fit_weights, n_items)
         # run_exp(EA, EA_params, n_runs, problem_name, problem_info, suffix='')
         # run_exp_parallel(EA, EA_params, n_runs, problem_name, problem_info, suffix='')
     
