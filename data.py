@@ -100,6 +100,42 @@ def eval_ind_kp(individual, items_dict, capacity, penalty=1):
             return (0,)
     return (value,) # Not over capacity return value
 
+def eval_noisy_kp_v1(individual, items_dict, capacity, noise_intensity=0, penalty=1):
+    """ Function calculates fitness for knapsack problem individual """
+    n_items = len(individual)
+    weight = sum(items_dict[i][1] * individual[i] for i in range(n_items)) # Calc solution weight
+    value = sum(items_dict[i][0] * individual[i] for i in range(n_items)) # Calc solution value
+    
+    noise = random.gauss(0, noise_intensity)
+    weight = weight + noise
+
+    # Check if over capacity and return reduced value
+    if weight > capacity:
+        if penalty == 1:
+            value_with_penalty = capacity - weight
+            return (value_with_penalty,)
+        else:
+            return (0,)
+    return (value,) # Not over capacity return value
+
+def eval_noisy_kp_v2(individual, items_dict, capacity, noise_intensity=0, penalty=1):
+    """ Function calculates fitness for knapsack problem individual """
+    n_items = len(individual)
+    weight = sum(items_dict[i][1] * individual[i] for i in range(n_items)) # Calc solution weight
+    value = sum(items_dict[i][0] * individual[i] for i in range(n_items)) # Calc solution value
+    
+    noise = random.gauss(0, noise_intensity)
+    value = value + noise
+
+    # Check if over capacity and return reduced value
+    if (weight + noise) > capacity:
+        if penalty == 1:
+            value_with_penalty = capacity - weight
+            return (value_with_penalty,)
+        else:
+            return (0,)
+    return (value,) # Not over capacity return value
+
 def rastrigin_eval(individual, amplitude=10):
     # print(f"Evaluating individual: {individual}")
     # print(f"Types in individual: {[type(x) for x in individual]}")
@@ -628,8 +664,15 @@ def extract_transitions(unique_solutions):
 def conduct_runs(num_runs, algorithm_function, param_dict):
     " Function conducts multiple algorithm runs "
     all_run_trajectories = []
+    random_seed = 0
+    random.seed(random_seed)
+    np.random.seed(random_seed)
     
-    for run in trange(num_runs, desc='Running multiple evolutions'):
+    for run in trange(num_runs, desc=f'Running {algorithm_function.__name__}'):
+        random_seed += 1
+        random.seed(random_seed)
+        np.random.seed(random_seed)
+
         # Run the given algorithm with the provided parameters
         all_generations, best_solutions, best_fitnesses, true_fitnesses = algorithm_function(**param_dict)
         
@@ -717,24 +760,25 @@ def save_problem(problem_info, problem_name):
     with open(file_path, 'w') as file:
         json.dump(serializable_info, file)
 
-def get_exp_name(function, parameters, suffix=''):
+def get_exp_name(function, parameters, noisevalue, suffix=''):
     from datetime import datetime
     function_name = function.__name__
 
     now = datetime.now()
     timestamp = now.strftime("%Y%m%d%H%M%S")
+    timestampsnip = timestamp[-4:]
     # gen = parameters['NGEN']
-    gen = 0
-    if 'popsize' in parameters:
-        pop = parameters['popsize']
-    else: pop = 'NA'
+    # gen = 0
+    # if 'popsize' in parameters:
+    #     pop = parameters['popsize']
+    # else: pop = 'NA'
 
-    exp_name = f"{function_name}{suffix}_g{gen}_p{pop}_{timestamp}"
+    exp_name = f"{function_name}-{suffix}_noise{noisevalue}_{timestampsnip}"
     return exp_name
 
 
-def run_exp(algo, parameters, n_runs, problem_name, problem_info, suffix=''):
-    name = get_exp_name(algo, parameters, suffix)
+def run_exp(algo, parameters, n_runs, problem_name, problem_info, noisevalue, suffix=''):
+    name = get_exp_name(algo, parameters, noisevalue, suffix)
     data = conduct_runs(n_runs, algo, parameters)
     save_data(data, problem_name, name)
     save_parameters(parameters, problem_name, name)
@@ -760,17 +804,10 @@ def run_exp(algo, parameters, n_runs, problem_name, problem_info, suffix=''):
 # fitness_function = (eval_ind_kp, {'items_dict': items_dict, 'capacity': capacity, 'penalty': 1})
 
 
-
 def run_algorithm(args):
     """Wrapper function to run a single algorithm instance."""
     algorithm_function, param_dict = args
-
-    # Extract the unique run_index and use it to seed the random number generator
-    # run_index = param_dict.pop("run_index", None)
-
     all_generations, best_solutions, best_fitnesses, true_fitnesses = algorithm_function(**param_dict)
-
-    # Extract trajectories and transitions
     unique_solutions, unique_fitnesses, solution_iterations = extract_trajectory_data(best_solutions, true_fitnesses)
     transitions = extract_transitions(unique_solutions)
     
@@ -779,9 +816,6 @@ def run_algorithm(args):
 def conduct_runs_parallel(num_runs, algorithm_function, param_dict):
     """Conducts multiple algorithm runs in parallel."""
     args = [(algorithm_function, param_dict) for _ in range(num_runs)]
-    # args = [(algorithm_function, {**param_dict, "run_index": index}) for index in range(num_runs)]
-
-    # Use ProcessPoolExecutor for parallel execution
     with ProcessPoolExecutor(max_workers=multiprocessing.cpu_count()) as executor:
         results = list(executor.map(run_algorithm, args))
 
@@ -803,6 +837,15 @@ def binary_attribute():
 def Rastrigin_attribute():
     return random.uniform(-5.12, 5.12)
 
+def generate_random_solutions(length, attribute_function, n_solutions):
+    solutions = []
+    for _ in range(n_solutions):
+        solution = []
+        for _ in range(length):
+            solution.append(attribute_function())
+        solutions.append(solution)
+    return solutions
+
 def get_base_HC(attr_function, mutate_function, fitness_function, true_fitness_function, fit_weights, n_items):
     ss = generate_zero_solution(n_items)
     HC_params = {
@@ -812,7 +855,7 @@ def get_base_HC(attr_function, mutate_function, fitness_function, true_fitness_f
         'attr_function': attr_function,
         'mutate_function': mutate_function,
         'fitness_function': fitness_function, # algorithm objective function
-        'starting_solution': ss, # Specified starting solution for all individuals
+        'starting_solution': None, # Specified starting solution for all individuals
         'true_fitness_function': true_fitness_function, # noise-less fitness function for performance evaluation
     }
     return HC_params
@@ -828,7 +871,7 @@ def get_base_OnePlusOneEA(attr_function, mutate_function, fitness_function, true
         'attr_function': attr_function,
         'mutate_function': mutate_function,
         'fitness_function': fitness_function, # algorithm objective function
-        'starting_solution': ss, # Specified starting solution for all individuals
+        'starting_solution': None, # Specified starting solution for all individuals
         'true_fitness_function': true_fitness_function, # noise-less fitness function for performance evaluation
     }
     return HC_params
@@ -862,7 +905,7 @@ def get_base_EA(attr_function, mutate_function, fitness_function, true_fitness_f
     'tournsize': 2, # Tournament selection size
     'mutate_function': mutate_function,
     'fitness_function': fitness_function, # algorithm objective function
-    'starting_solution': ss, # Specified starting solution for all individuals
+    'starting_solution': None, # Specified starting solution for all individuals
     'true_fitness_function': true_fitness_function, # noise-less fitness function for performance evaluation
     'n_elite': 0
     }
@@ -885,24 +928,24 @@ def get_base_UMDA(attr_function, fitness_function, true_fitness_function, fit_we
     return UMDA_params
 
 problem_names = [
-        # 'f1_l-d_kp_10_269',
+        'f1_l-d_kp_10_269',
         # 'f2_l-d_kp_20_878',
-        # 'f3_l-d_kp_4_20',
+        'f3_l-d_kp_4_20',
         # 'f4_l-d_kp_4_11',
         # 'f5_l-d_kp_15_375',
         # 'f6_l-d_kp_10_60',
         # 'f7_l-d_kp_7_50',
-        'f8_l-d_kp_23_10000',
+        # 'f8_l-d_kp_23_10000',
         # 'f9_l-d_kp_5_80',
-        # 'f10_l-d_kp_20_879',
-        # 'knapPI_1_100_1000_1',
+        'f10_l-d_kp_20_879',
+        'knapPI_1_100_1000_1',
         # 'knapPI_2_100_1000_1',
         # 'knapPI_3_100_1000_1'
     ]
 
 if __name__ == "__main__":    
     n_runs_HC = 120
-    n_runs = 3
+    n_runs = 5
 
 
     # OneMax Problems
@@ -910,59 +953,61 @@ if __name__ == "__main__":
     problem_name = 'OneMax_100item'
     n_items = 100
     fit_weights = (1.0,)
+    problem_info = {'n_items': n_items}
 
     OneMaxEvals = [38392, 41066, 44477, 50728, 56851, 64079, 70736, 79034, 86078, 93638]
     OneMaxEvalsWithZero = [38392] + OneMaxEvals
     noise_stdev = 0
     num_noise_values = 10
-    noise_values = list(np.linspace(2, int(np.sqrt(n_items)), num=num_noise_values, dtype=int))
+    noise_values = list(np.linspace(1, int(np.sqrt(n_items)), num=num_noise_values, dtype=int))
     noise_values_with_zero = [0] + noise_values
+
+    OneMaxEvalsWithZero = [38392, 44477, 64079, 86078]
+    noise_values_with_zero = [0, 3, 6, 9]
 
     for evalLimit, noisevalue in zip(OneMaxEvalsWithZero, noise_values_with_zero):
 
-        # mutate_function = (random_bit_flip, {'n_flips': 1})
-        # selection_pressure_parameter = 0.1
-        # selection_pressure_parameter = 3
-        # mutation_rate = selection_pressure_parameter / (3 * n_items * max(1, noisevalue))
         mutation_rate = 1 / (n_items)
-
         mutate_function = (tools.mutFlipBit, {'indpb': mutation_rate})
         fitness_function = (OneMax_fitness, {'noise_intensity': noisevalue})
         true_fitness_function = (OneMax_fitness, {'noise_intensity': 0})
-
-        problem_info = {'n_items': n_items}
         
         PCEA_popsize = int(10 * np.sqrt(n_items) * np.log(n_items))
         mutEA_popsize = int(max(1, noisevalue**2) * np.log(n_items))
         UMDA_popsize = int(20 * np.sqrt(n_items) * np.log(n_items))
 
+        # HC_params = get_base_HC(binary_attribute, mutate_function, fitness_function, fit_weights, n_items)
+        # run_exp(HC, HC_params, n_runs_HC, problem_name, problem_info, suffix='')
 
         # Run PCEA
         PCEA_params = get_base_PCEA(binary_attribute, fitness_function, true_fitness_function, fit_weights, n_items)
         PCEA_params['popsize'] = PCEA_popsize
         PCEA_params['evals'] = evalLimit
-        # run_exp(PCEA, PCEA_params, n_runs, problem_name, problem_info, suffix='')
-
-        # HC_params = get_base_HC(binary_attribute, mutate_function, fitness_function, fit_weights, n_items)
-        # run_exp(HC, HC_params, n_runs_HC, problem_name, problem_info, suffix='')
+        run_exp(PCEA, PCEA_params, n_runs, problem_name, problem_info, noisevalue, suffix='')
 
         # Run UMDA
         UMDA_params = get_base_UMDA(binary_attribute, fitness_function, true_fitness_function, fit_weights, n_items)
         UMDA_params['popsize'] = UMDA_popsize
         UMDA_params['evals'] = evalLimit
-        # run_exp(UMDA, UMDA_params, n_runs, problem_name, problem_info, suffix='')
+        run_exp(UMDA, UMDA_params, n_runs, problem_name, problem_info, noisevalue, suffix='')
         
         # Run 1+1 EA
         OnePlusOneParams = get_base_OnePlusOneEA(binary_attribute, mutate_function, fitness_function, true_fitness_function, fit_weights, n_items)
         OnePlusOneParams['evals'] = evalLimit
-        run_exp(OnePlusOneEA, OnePlusOneParams, n_runs, problem_name, problem_info, suffix='')
+        run_exp(OnePlusOneEA, OnePlusOneParams, n_runs, problem_name, problem_info, noisevalue, suffix='')
 
         # Run Mutation population
         EA_params = get_base_EA(binary_attribute, mutate_function, fitness_function, true_fitness_function, fit_weights, n_items)
         EA_params['popsize'] = mutEA_popsize
-        # EA_params['n_elite'] = int(mutEA_popsize/10)
         EA_params['evals'] = evalLimit
-        # run_exp(EA, EA_params, n_runs, problem_name, problem_info, suffix='')
+        run_exp(EA, EA_params, n_runs, problem_name, problem_info, noisevalue, suffix='')
+
+        # Run Mutation population elitism
+        EA_params = get_base_EA(binary_attribute, mutate_function, fitness_function, true_fitness_function, fit_weights, n_items)
+        EA_params['popsize'] = mutEA_popsize
+        EA_params['n_elite'] = int(max(1,(mutEA_popsize/10)))
+        EA_params['evals'] = evalLimit
+        run_exp(EA, EA_params, n_runs, problem_name, problem_info, noisevalue, suffix='elite')
 
 
     # KP problems
@@ -970,20 +1015,49 @@ if __name__ == "__main__":
         # Load problem, fitness, operations
         n_items, capacity, optimal, values, weights, items_dict, problem_info = load_problem_KP(problem_name)
         fit_weights = (1.0,)
-        fitness_function = (eval_ind_kp, {'items_dict': items_dict, 'capacity': capacity, 'penalty': 1})
-        mutate_function = (random_bit_flip, {'n_flips': 1})
 
-        HC_params = get_base_HC(binary_attribute, mutate_function, fitness_function, true_fitness_function, fit_weights, n_items)
-        # run_exp(HC, HC_params, n_runs, problem_name, problem_info, suffix='') # single threaded
-        # run_exp_parallel(HC, HC_params, n_runs_HC, problem_name, problem_info, suffix='') # multithreaded
+        OneMaxEvalsWithZero = [38392, 44477, 64079, 86078]
+        noise_values_with_zero = [0, 3, 6, 9]
 
-        UMDA_params = get_base_UMDA(binary_attribute, fitness_function, true_fitness_function, fit_weights, n_items)
-        # run_exp(UMDA, UMDA_params, n_runs, problem_name, problem_info, suffix='')
-        # run_exp_parallel(UMDA, UMDA_params, n_runs, problem_name, problem_info, suffix='')
-        
-        EA_params = get_base_EA(binary_attribute, mutate_function, fitness_function, true_fitness_function, fit_weights, n_items)
-        # run_exp(EA, EA_params, n_runs, problem_name, problem_info, suffix='')
-        # run_exp_parallel(EA, EA_params, n_runs, problem_name, problem_info, suffix='')
+        for evalLimit, noisevalue in zip(OneMaxEvalsWithZero, noise_values_with_zero):
+            mutation_rate = 1 / (n_items)
+            mutate_function = (tools.mutFlipBit, {'indpb': mutation_rate})
+            fitness_function = (eval_noisy_kp_v1, {'items_dict': items_dict, 'capacity': capacity, 'noise_intensity': noisevalue, 'penalty': 1})
+            true_fitness_function = (eval_ind_kp, {'items_dict': items_dict, 'capacity': capacity, 'penalty': 1})
+
+            PCEA_popsize = int(10 * np.sqrt(n_items) * np.log(n_items))
+            mutEA_popsize = int(max(1, noisevalue**2) * np.log(n_items))
+            UMDA_popsize = int(20 * np.sqrt(n_items) * np.log(n_items))
+
+            # Run PCEA
+            PCEA_params = get_base_PCEA(binary_attribute, fitness_function, true_fitness_function, fit_weights, n_items)
+            PCEA_params['popsize'] = PCEA_popsize
+            PCEA_params['evals'] = evalLimit
+            run_exp(PCEA, PCEA_params, n_runs, problem_name, problem_info, noisevalue, suffix='')
+
+            # Run UMDA
+            UMDA_params = get_base_UMDA(binary_attribute, fitness_function, true_fitness_function, fit_weights, n_items)
+            UMDA_params['popsize'] = UMDA_popsize
+            UMDA_params['evals'] = evalLimit
+            run_exp(UMDA, UMDA_params, n_runs, problem_name, problem_info, noisevalue, suffix='')
+            
+            # Run 1+1 EA
+            OnePlusOneParams = get_base_OnePlusOneEA(binary_attribute, mutate_function, fitness_function, true_fitness_function, fit_weights, n_items)
+            OnePlusOneParams['evals'] = evalLimit
+            run_exp(OnePlusOneEA, OnePlusOneParams, n_runs, problem_name, problem_info, noisevalue, suffix='')
+
+            # Run Mutation population
+            EA_params = get_base_EA(binary_attribute, mutate_function, fitness_function, true_fitness_function, fit_weights, n_items)
+            EA_params['popsize'] = mutEA_popsize
+            EA_params['evals'] = evalLimit
+            run_exp(EA, EA_params, n_runs, problem_name, problem_info, noisevalue, suffix='')
+
+            # Run Mutation population elitism
+            EA_params = get_base_EA(binary_attribute, mutate_function, fitness_function, true_fitness_function, fit_weights, n_items)
+            EA_params['popsize'] = mutEA_popsize
+            EA_params['n_elite'] = int(max(1,(mutEA_popsize/10)))
+            EA_params['evals'] = evalLimit
+            run_exp(EA, EA_params, n_runs, problem_name, problem_info, noisevalue, suffix='elite')
     
     # Rastrigin problem
     # problem_name = 'rastriginN2A10'
