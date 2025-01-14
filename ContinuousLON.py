@@ -17,26 +17,6 @@ all_runs_local_optima = []
 all_runs_edges = []
 all_runs_fitness_values = []
 
-
-# Track the best result and the number of non-improving iterations for basin hoping
-# class StopAfterNoImprovement:
-#     def __init__(self, max_no_improve=1000):
-#         self.best_fitness = float('inf')
-#         self.no_improve_counter = 0
-#         self.max_no_improve = max_no_improve
-
-#     def __call__(self, x, f, accept):
-#         if f < self.best_fitness:
-#             self.best_fitness = f
-#             self.no_improve_counter = 0
-#         else:
-#             self.no_improve_counter += 1
-
-#         # Stop condition: 1000 iterations without improvement
-#         if self.no_improve_counter >= self.max_no_improve:
-#             return True  # Stop the optimization
-#         return False
-
 class BasinHoppingCallback:
     def __init__(self, precision=1e-5, max_no_improve=1000):
         self.local_optima = []  # To track local optima

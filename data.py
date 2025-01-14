@@ -958,8 +958,8 @@ if __name__ == "__main__":
     noise_values = list(np.linspace(1, int(np.sqrt(n_items)), num=num_noise_values, dtype=int))
     noise_values_with_zero = [0] + noise_values
 
-    # OneMaxEvalsWithZero = [38392, 44477, 64079, 86078]
-    # noise_values_with_zero = [0, 3, 6, 9]
+    OneMaxEvalsWithZero = [38392, 44477, 64079, 86078]
+    noise_values_with_zero = [0, 3, 6, 9]
 
     HC_fitness_function = (OneMax_fitness, {'noise_intensity': 0})
     HC_mutate = (random_bit_flip, {})
@@ -998,7 +998,7 @@ if __name__ == "__main__":
         EA_params = get_base_EA(binary_attribute, mutate_function, fitness_function, true_fitness_function, fit_weights, n_items)
         EA_params['popsize'] = mutEA_popsize
         EA_params['evals'] = evalLimit
-        # run_exp(EA, EA_params, n_runs, problem_name, problem_info, noisevalue, suffix='')
+        run_exp(EA, EA_params, n_runs, problem_name, problem_info, noisevalue, suffix='BigPop')
 
         # Run Mutation population elitism
         EA_params = get_base_EA(binary_attribute, mutate_function, fitness_function, true_fitness_function, fit_weights, n_items)
@@ -1020,7 +1020,7 @@ if __name__ == "__main__":
         HC_fitness_function = (eval_ind_kp, {'items_dict': items_dict, 'capacity': capacity, 'penalty': 1})
         HC_mutate = (random_bit_flip, {})
         HC_params = get_base_HC(binary_attribute, HC_mutate, HC_fitness_function, HC_fitness_function, fit_weights, n_items)
-        run_exp(HC, HC_params, n_runs_HC, problem_name, problem_info, 0, suffix='')
+        # run_exp(HC, HC_params, n_runs_HC, problem_name, problem_info, 0, suffix='')
 
         for evalLimit, noisevalue in zip(OneMaxEvalsWithZero, noise_values_with_zero):
             mutation_rate = 1 / (n_items)
@@ -1053,7 +1053,7 @@ if __name__ == "__main__":
             EA_params = get_base_EA(binary_attribute, mutate_function, fitness_function, true_fitness_function, fit_weights, n_items)
             EA_params['popsize'] = mutEA_popsize
             EA_params['evals'] = evalLimit
-            # run_exp(EA, EA_params, n_runs, problem_name, problem_info, noisevalue, suffix='V2')
+            run_exp(EA, EA_params, n_runs, problem_name, problem_info, noisevalue, suffix='BigPop')
 
             # Run Mutation population elitism
             EA_params = get_base_EA(binary_attribute, mutate_function, fitness_function, true_fitness_function, fit_weights, n_items)

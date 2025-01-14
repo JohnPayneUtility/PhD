@@ -519,7 +519,7 @@ def update_plot(options, run_options, layout_value, hover_info_value, all_trajec
         node_sizes = [50 + G.nodes[node]['iterations'] * 20 for node in G.nodes()]
     else:
         # Node sizes based on the number of incoming edges (in-degree)
-        node_sizes = [5 + G.in_degree(node) * 5 for node in G.nodes()]
+        node_sizes = [50 + G.in_degree(node) * 50 for node in G.nodes()]
 
     # Prepare node positions based on selected layout
     if layout == 'mds':

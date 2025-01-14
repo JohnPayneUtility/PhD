@@ -1,0 +1,119 @@
+{
+    "len_sol": 10,
+    "weights": [
+        1.0
+    ],
+    "popsize": 20,
+    "gens": 1000000,
+    "evals": 44477,
+    "target": null,
+    "attr_function": "binary_attribute",
+    "tournsize": 2,
+    "mutate_function": [
+        "mutFlipBit",
+        {
+            "indpb": 0.1
+        }
+    ],
+    "fitness_function": [
+        "eval_noisy_kp_v2",
+        {
+            "items_dict": {
+                "0": [
+                    55,
+                    95
+                ],
+                "1": [
+                    10,
+                    4
+                ],
+                "2": [
+                    47,
+                    60
+                ],
+                "3": [
+                    5,
+                    32
+                ],
+                "4": [
+                    4,
+                    23
+                ],
+                "5": [
+                    50,
+                    72
+                ],
+                "6": [
+                    8,
+                    80
+                ],
+                "7": [
+                    61,
+                    62
+                ],
+                "8": [
+                    85,
+                    65
+                ],
+                "9": [
+                    87,
+                    46
+                ]
+            },
+            "capacity": 269,
+            "noise_intensity": 3,
+            "penalty": 1
+        }
+    ],
+    "starting_solution": null,
+    "true_fitness_function": [
+        "eval_ind_kp",
+        {
+            "items_dict": {
+                "0": [
+                    55,
+                    95
+                ],
+                "1": [
+                    10,
+                    4
+                ],
+                "2": [
+                    47,
+                    60
+                ],
+                "3": [
+                    5,
+                    32
+                ],
+                "4": [
+                    4,
+                    23
+                ],
+                "5": [
+                    50,
+                    72
+                ],
+                "6": [
+                    8,
+                    80
+                ],
+                "7": [
+                    61,
+                    62
+                ],
+                "8": [
+                    85,
+                    65
+                ],
+                "9": [
+                    87,
+                    46
+                ]
+            },
+            "capacity": 269,
+            "penalty": 1
+        }
+    ],
+    "n_elite": 0
+}
