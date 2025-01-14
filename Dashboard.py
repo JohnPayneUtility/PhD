@@ -369,6 +369,7 @@ def update_plot(options, run_options, layout_value, hover_info_value, all_trajec
         closest_run_idx = np.argmin([abs(fitness - median_final_fitness) for fitness in final_fitnesses])
         return all_run_trajectories[closest_run_idx]
     
+    transition_counts = {}
     # Function to add nodes and edges to the graph
     def add_trajectories_to_graph(all_run_trajectories, edge_color):
         for run_idx, (unique_solutions, unique_fitnesses, solution_iterations, transitions) in enumerate(all_run_trajectories):
@@ -388,11 +389,15 @@ def update_plot(options, run_options, layout_value, hover_info_value, all_trajec
                     end_nodes.add(node_label)
 
             # Add edges based on transitions
-            for prev_solution, current_solution in transitions:
+            for j, (prev_solution, current_solution) in enumerate(transitions):
                 prev_solution = tuple(prev_solution)
                 current_solution = tuple(current_solution)
                 if prev_solution in node_mapping and current_solution in node_mapping:
-                    G.add_edge(node_mapping[prev_solution], node_mapping[current_solution], color=edge_color)
+                    # transition = (node_mapping[prev_solution], node_mapping[current_solution])
+                    # if transition not in transition_counts:
+                    #     transition_counts[transition] = 0
+                    # transition_counts[transition] += 1
+                    G.add_edge(node_mapping[prev_solution], node_mapping[current_solution], weight=np.log10(solution_iterations[i]), color=edge_color)
     
     # Add trajectory nodes if provided
     if all_trajectories_list:
@@ -431,28 +436,47 @@ def update_plot(options, run_options, layout_value, hover_info_value, all_trajec
     
     # Add local optima nodes if provided
     if local_optima:
-        local_optima_solutions, local_optima_fitnesses = local_optima
-        for i, (solution, fitness) in enumerate(zip(local_optima_solutions, local_optima_fitnesses)):
-            solution_tuple = tuple(solution)
-            if solution_tuple not in node_mapping:
-                node_label = f"Local Optimum {len(node_mapping) + 1}"
-                node_mapping[solution_tuple] = node_label
-                G.add_node(node_label, solution=solution, fitness=fitness)
+        # print(len(local_optima))
+        local_optima_solutions, local_optima_fitnesses, local_optima_edges = local_optima
+        for run_idx, (solutions, fitnesses, edges) in enumerate(zip(local_optima_solutions, local_optima_fitnesses, local_optima_edges)):
+            # print(len(solutions))
+            for i, solution in enumerate(solutions):
+                # print(len(solution))
+                solution_tuple = tuple(solution)
+                if solution_tuple not in node_mapping:
+                    node_label = f"Local Optimum {len(node_mapping) + 1}"
+                    node_mapping[solution_tuple] = node_label
+                    G.add_node(node_label, solution=solution, fitness=fitnesses[i])
+            # print('nodes done')
+
+            for prev_solution, current_solution in edges:
+                prev_solution = tuple(prev_solution)
+                current_solution = tuple(current_solution)
+                if prev_solution in node_mapping and current_solution in node_mapping:
+                    # Track transition frequency
+                    transition = (node_mapping[prev_solution], node_mapping[current_solution])
+                    if transition not in transition_counts:
+                        transition_counts[transition] = 0
+                    transition_counts[transition] += 1
+                    # G.add_edge(node_mapping[prev_solution], node_mapping[current_solution], color='black')
+
+    for (node1, node2), count in transition_counts.items():
+        G.add_edge(node1, node2, weight=np.log10(count), color='black')
 
     # Find overall best solution from local optima
     if not all_trajectories_list:
         optimisation_goal = 'max'
     
-    if local_optima:
-        local_optima_solutions, local_optima_fitnesses = local_optima
-        if optimisation_goal == "max":
-            local_optima_best_fitness = max(local_optima_fitnesses)
-            if local_optima_best_fitness > overall_best_fitness:
-                overall_best_fitness = local_optima_best_fitness
-        else:  # Minimization
-            local_optima_best_fitness = min(local_optima_fitnesses)
-            if local_optima_best_fitness < overall_best_fitness:
-                overall_best_fitness = local_optima_best_fitness
+    # if local_optima:
+    #     local_optima_solutions, local_optima_fitnesses, local_optima_edges = local_optima
+    #     if optimisation_goal == "max":
+    #         local_optima_best_fitness = max(local_optima_fitnesses)
+    #         if local_optima_best_fitness > overall_best_fitness:
+    #             overall_best_fitness = local_optima_best_fitness
+    #     else:  # Minimization
+    #         local_optima_best_fitness = min(local_optima_fitnesses)
+    #         if local_optima_best_fitness < overall_best_fitness:
+    #             overall_best_fitness = local_optima_best_fitness
 
     # Find the overall best node
     for node, data in G.nodes(data=True):
@@ -495,7 +519,7 @@ def update_plot(options, run_options, layout_value, hover_info_value, all_trajec
         node_sizes = [50 + G.nodes[node]['iterations'] * 20 for node in G.nodes()]
     else:
         # Node sizes based on the number of incoming edges (in-degree)
-        node_sizes = [50 + G.in_degree(node) * 50 for node in G.nodes()]
+        node_sizes = [5 + G.in_degree(node) * 5 for node in G.nodes()]
 
     # Prepare node positions based on selected layout
     if layout == 'mds':
@@ -577,12 +601,13 @@ def update_plot(options, run_options, layout_value, hover_info_value, all_trajec
         for edge in G.edges(data=True):
             x0, y0, z0 = pos[edge[0]][0], pos[edge[0]][1], G.nodes[edge[0]]['fitness']
             x1, y1, z1 = pos[edge[1]][0], pos[edge[1]][1], G.nodes[edge[1]]['fitness']
+            weight = edge[2]['weight']  # Access the edge weight
             trace = go.Scatter3d(
                 x=[x0, x1],
                 y=[y0, y1],
                 z=[z0, z1],
                 mode='lines',
-                line=dict(width=2, color=edge[2].get('color', 'black')),
+                line=dict(width=weight * 1, color=edge[2].get('color', 'black')),
                 hoverinfo='none'
             )
             fig.add_trace(trace)

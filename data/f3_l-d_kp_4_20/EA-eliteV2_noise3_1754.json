@@ -1,0 +1,71 @@
+{
+    "len_sol": 4,
+    "weights": [
+        1.0
+    ],
+    "popsize": 12,
+    "gens": 1000000,
+    "evals": 44477,
+    "target": null,
+    "attr_function": "binary_attribute",
+    "tournsize": 2,
+    "mutate_function": [
+        "mutFlipBit",
+        {
+            "indpb": 0.25
+        }
+    ],
+    "fitness_function": [
+        "eval_noisy_kp_v2",
+        {
+            "items_dict": {
+                "0": [
+                    9,
+                    6
+                ],
+                "1": [
+                    11,
+                    5
+                ],
+                "2": [
+                    13,
+                    9
+                ],
+                "3": [
+                    15,
+                    7
+                ]
+            },
+            "capacity": 20,
+            "noise_intensity": 3,
+            "penalty": 1
+        }
+    ],
+    "starting_solution": null,
+    "true_fitness_function": [
+        "eval_ind_kp",
+        {
+            "items_dict": {
+                "0": [
+                    9,
+                    6
+                ],
+                "1": [
+                    11,
+                    5
+                ],
+                "2": [
+                    13,
+                    9
+                ],
+                "3": [
+                    15,
+                    7
+                ]
+            },
+            "capacity": 20,
+            "penalty": 1
+        }
+    ],
+    "n_elite": 1
+}
