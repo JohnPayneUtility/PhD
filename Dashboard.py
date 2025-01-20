@@ -436,32 +436,29 @@ def update_plot(options, run_options, layout_value, hover_info_value, all_trajec
     
     # Add local optima nodes if provided
     if local_optima:
-        # print(len(local_optima))
-        local_optima_solutions, local_optima_fitnesses, local_optima_edges = local_optima
-        for run_idx, (solutions, fitnesses, edges) in enumerate(zip(local_optima_solutions, local_optima_fitnesses, local_optima_edges)):
-            # print(len(solutions))
-            for i, solution in enumerate(solutions):
-                # print(len(solution))
-                solution_tuple = tuple(solution)
-                if solution_tuple not in node_mapping:
-                    node_label = f"Local Optimum {len(node_mapping) + 1}"
-                    node_mapping[solution_tuple] = node_label
-                    G.add_node(node_label, solution=solution, fitness=fitnesses[i])
-            # print('nodes done')
+        for run_idx, (opt, fitness) in enumerate(zip(local_optima["local_optima"], local_optima["fitness_values"])):
+            # if solution_tuple not in node_mapping:
+            node_label = f"Local Optimum {len(node_mapping) + 1}"
+            node_mapping[opt] = node_label
+            G.add_node(node_label, solution=opt, fitness=fitness)
 
-            for prev_solution, current_solution in edges:
-                prev_solution = tuple(prev_solution)
-                current_solution = tuple(current_solution)
-                if prev_solution in node_mapping and current_solution in node_mapping:
-                    # Track transition frequency
-                    transition = (node_mapping[prev_solution], node_mapping[current_solution])
-                    if transition not in transition_counts:
-                        transition_counts[transition] = 0
-                    transition_counts[transition] += 1
-                    # G.add_edge(node_mapping[prev_solution], node_mapping[current_solution], color='black')
+            for (source_idx, target_idx), weight in local_optima["edges"].items():
+                source_label = node_mapping[source_idx]
+                target_label = node_mapping[target_idx]
+                G.add_edge(source_label, target_label, weight=np.log10(weight), color='black')
 
-    for (node1, node2), count in transition_counts.items():
-        G.add_edge(node1, node2, weight=np.log10(count), color='black')
+    #         for prev_solution, current_solution in edges:
+    #             prev_solution = tuple(prev_solution)
+    #             current_solution = tuple(current_solution)
+    #             if prev_solution in node_mapping and current_solution in node_mapping:
+    #                 transition = (node_mapping[prev_solution], node_mapping[current_solution])
+    #                 if transition not in transition_counts:
+    #                     transition_counts[transition] = 0
+    #                 transition_counts[transition] += 1
+    #                 # G.add_edge(node_mapping[prev_solution], node_mapping[current_solution], color='black')
+
+    # for (node1, node2), count in transition_counts.items():
+    #     G.add_edge(node1, node2, weight=np.log10(count), color='black')
 
     # Find overall best solution from local optima
     if not all_trajectories_list:
