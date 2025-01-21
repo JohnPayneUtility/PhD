@@ -10,6 +10,38 @@ import os
 import pickle
 import json
 
+from LON_Utilities import convert_to_single_edges_format
+
+# Function to calculate Hamming distance
+def hamming_distance(sol1, sol2):
+    return sum(el1 != el2 for el1, el2 in zip(sol1, sol2))
+
+def select_top_runs_by_fitness(all_run_trajectories, n_runs_display, optimisation_goal):
+    if optimisation_goal == 'max':
+        # Sort runs by the best (highest) final fitness, in descending order
+        sorted_runs = sorted(all_run_trajectories, 
+                            key=lambda run: run[1][-1],
+                            reverse=True)
+    else:
+        # Sort runs by the best (lowest) final fitness, in ascending order
+        sorted_runs = sorted(all_run_trajectories, 
+                            key=lambda run: run[1][-1],
+                            reverse=False)
+    top_runs = sorted_runs[:n_runs_display] # Cap the number of runs to display
+    return top_runs
+
+def get_mean_run(all_run_trajectories):
+    final_fitnesses = [run[1][-1] for run in all_run_trajectories]
+    mean_final_fitness = np.mean(final_fitnesses)
+    closest_run_idx = np.argmin([abs(fitness - mean_final_fitness) for fitness in final_fitnesses])
+    return all_run_trajectories[closest_run_idx]
+
+def get_median_run(all_run_trajectories):
+    final_fitnesses = [run[1][-1] for run in all_run_trajectories]
+    median_final_fitness = np.median(final_fitnesses)
+    closest_run_idx = np.argmin([abs(fitness - median_final_fitness) for fitness in final_fitnesses])
+    return all_run_trajectories[closest_run_idx]
+
 # Get list of folders in the data directory
 data_folder = 'data'
 folder_options = [{'label': folder, 'value': folder} for folder in os.listdir(data_folder) if os.path.isdir(os.path.join(data_folder, folder))]
@@ -88,9 +120,11 @@ app.layout = html.Div([
         id='options',
         options=[
             {'label': 'Show Labels', 'value': 'show_labels'},
-            {'label': 'Hide Nodes', 'value': 'hide_nodes'},
+            {'label': 'Hide STN Nodes', 'value': 'hide_STN_nodes'},
+            {'label': 'Hide LON Nodes', 'value': 'hide_LON_nodes'},
             {'label': '3D Plot', 'value': 'plot_3D'},
-            {'label': 'Use Solution Iterations', 'value': 'use_solution_iterations'}
+            {'label': 'Use Solution Iterations', 'value': 'use_solution_iterations'},
+            {'label': 'Use strength for LON node size', 'value': 'LON_node_strength'}
         ],
         value=[]
     ),
@@ -154,6 +188,33 @@ app.layout = html.Div([
         ],
         id='y-slider-container',  # Add an ID for the container
         style={'display': 'none'}  # Initially hidden
+    ),
+    dcc.Slider(
+    id='node-size-slider',
+    min=1,
+    max=100,
+    step=1,
+    value=50,  # Default scaling factor
+    marks={i: str(i) for i in range(1, 101, 10)},
+    tooltip={"placement": "bottom", "always_visible": False}
+    ),
+    dcc.Slider(
+    id='LON-edge-size-slider',
+    min=1,
+    max=100,
+    step=1,
+    value=50,  # Default scaling factor
+    marks={i: str(i) for i in range(1, 100, 10)},
+    tooltip={"placement": "bottom", "always_visible": False}
+    ),
+    dcc.Slider(
+    id='STN-edge-size-slider',
+    min=1,
+    max=100,
+    step=1,
+    value=50,  # Default scaling factor
+    marks={i: str(i) for i in range(1, 101, 10)},
+    tooltip={"placement": "bottom", "always_visible": False}
     ),
     dcc.Graph(id='trajectory-plot'),
     dcc.Store(id='algo-info'),
@@ -304,17 +365,19 @@ def update_algo_info(all_info_files_list):
      Input('local-optima', 'data'),
      Input('use-range-sliders', 'value'),
      Input('x-axis-slider', 'value'),
-    Input('y-axis-slider', 'value')]
+     Input('y-axis-slider', 'value'),
+     Input('node-size-slider', 'value'),
+     Input('LON-edge-size-slider', 'value'),
+     Input('STN-edge-size-slider', 'value')]
 )
-def update_plot(options, run_options, layout_value, hover_info_value, all_trajectories_list, n_runs_display, local_optima, use_range_slider, x_slider, y_slider):
-    # if not all_trajectories_list:
-    #     return go.Figure()
-    
+def update_plot(options, run_options, layout_value, hover_info_value, all_trajectories_list, n_runs_display, local_optima, use_range_slider, x_slider, y_slider, node_size_slider, LON_edge_size_slider, STN_edge_size_slider):
     # Options from checkboxes
     show_labels = 'show_labels' in options
-    hide_nodes = 'hide_nodes' in options
+    hide_STN_nodes = 'hide_STN_nodes' in options
+    hide_LON_nodes = 'hide_LON_nodes' in options
     plot_3D = 'plot_3D' in options
     use_solution_iterations = 'use_solution_iterations' in options
+    LON_node_strength = 'LON_node_strength' in options
 
     # Run options
     show_best = 'show_best' in run_options
@@ -338,38 +401,7 @@ def update_plot(options, run_options, layout_value, hover_info_value, all_trajec
     end_nodes = set()
     overall_best_fitness = 0
     overall_best_node = None
-
-    # Function to calculate Hamming distance
-    def hamming_distance(sol1, sol2):
-        return sum(el1 != el2 for el1, el2 in zip(sol1, sol2))
     
-    def select_top_runs_by_fitness(all_run_trajectories, n_runs_display, optimisation_goal):
-        if optimisation_goal == 'max':
-            # Sort runs by the best (highest) final fitness, in descending order
-            sorted_runs = sorted(all_run_trajectories, 
-                                key=lambda run: run[1][-1],
-                                reverse=True)
-        else:
-            # Sort runs by the best (lowest) final fitness, in ascending order
-            sorted_runs = sorted(all_run_trajectories, 
-                                key=lambda run: run[1][-1],
-                                reverse=False)
-        top_runs = sorted_runs[:n_runs_display] # Cap the number of runs to display
-        return top_runs
-    
-    def get_mean_run(all_run_trajectories):
-        final_fitnesses = [run[1][-1] for run in all_run_trajectories]
-        mean_final_fitness = np.mean(final_fitnesses)
-        closest_run_idx = np.argmin([abs(fitness - mean_final_fitness) for fitness in final_fitnesses])
-        return all_run_trajectories[closest_run_idx]
-    
-    def get_median_run(all_run_trajectories):
-        final_fitnesses = [run[1][-1] for run in all_run_trajectories]
-        median_final_fitness = np.median(final_fitnesses)
-        closest_run_idx = np.argmin([abs(fitness - median_final_fitness) for fitness in final_fitnesses])
-        return all_run_trajectories[closest_run_idx]
-    
-    transition_counts = {}
     # Function to add nodes and edges to the graph
     def add_trajectories_to_graph(all_run_trajectories, edge_color):
         for run_idx, (unique_solutions, unique_fitnesses, solution_iterations, transitions) in enumerate(all_run_trajectories):
@@ -393,11 +425,7 @@ def update_plot(options, run_options, layout_value, hover_info_value, all_trajec
                 prev_solution = tuple(prev_solution)
                 current_solution = tuple(current_solution)
                 if prev_solution in node_mapping and current_solution in node_mapping:
-                    # transition = (node_mapping[prev_solution], node_mapping[current_solution])
-                    # if transition not in transition_counts:
-                    #     transition_counts[transition] = 0
-                    # transition_counts[transition] += 1
-                    G.add_edge(node_mapping[prev_solution], node_mapping[current_solution], weight=np.log10(solution_iterations[i]), color=edge_color)
+                    G.add_edge(node_mapping[prev_solution], node_mapping[current_solution], weight=STN_edge_size_slider, color=edge_color)
     
     # Add trajectory nodes if provided
     if all_trajectories_list:
@@ -436,29 +464,32 @@ def update_plot(options, run_options, layout_value, hover_info_value, all_trajec
     
     # Add local optima nodes if provided
     if local_optima:
-        for run_idx, (opt, fitness) in enumerate(zip(local_optima["local_optima"], local_optima["fitness_values"])):
-            # if solution_tuple not in node_mapping:
-            node_label = f"Local Optimum {len(node_mapping) + 1}"
-            node_mapping[opt] = node_label
-            G.add_node(node_label, solution=opt, fitness=fitness)
+        local_optima = convert_to_single_edges_format(local_optima)
+        print(len(local_optima["local_optima"]))
 
-            for (source_idx, target_idx), weight in local_optima["edges"].items():
-                source_label = node_mapping[source_idx]
-                target_label = node_mapping[target_idx]
-                G.add_edge(source_label, target_label, weight=np.log10(weight), color='black')
+        max_weight = max(local_optima["edges"].values(), default=1)
 
-    #         for prev_solution, current_solution in edges:
-    #             prev_solution = tuple(prev_solution)
-    #             current_solution = tuple(current_solution)
-    #             if prev_solution in node_mapping and current_solution in node_mapping:
-    #                 transition = (node_mapping[prev_solution], node_mapping[current_solution])
-    #                 if transition not in transition_counts:
-    #                     transition_counts[transition] = 0
-    #                 transition_counts[transition] += 1
-    #                 # G.add_edge(node_mapping[prev_solution], node_mapping[current_solution], color='black')
+        for opt, fitness in zip(local_optima["local_optima"], local_optima["fitness_values"]):
+            solution_tuple = tuple(opt)  # Ensure the solution is a tuple
+            if solution_tuple not in node_mapping:
+                node_label = f"Local Optimum {len(node_mapping) + 1}"
+                node_mapping[solution_tuple] = node_label
+                G.add_node(node_label, solution=opt, fitness=fitness)
 
-    # for (node1, node2), count in transition_counts.items():
-    #     G.add_edge(node1, node2, weight=np.log10(count), color='black')
+        # Add edges to the graph directly from the `edges` dictionary
+        for (source, target), weight in local_optima["edges"].items():
+            source_tuple = tuple(source)
+            target_tuple = tuple(target)
+
+            # Ensure nodes exist in the mapping
+            if source_tuple in node_mapping and target_tuple in node_mapping:
+                source_label = node_mapping[source_tuple]
+                target_label = node_mapping[target_tuple]
+
+                # Add the edge with the weight from the 
+                normalized_weight = weight / max_weight
+                size = normalized_weight * LON_edge_size_slider
+                G.add_edge(source_label, target_label, weight=size, color='black')
 
     # Find overall best solution from local optima
     if not all_trajectories_list:
@@ -508,15 +539,21 @@ def update_plot(options, run_options, layout_value, hover_info_value, all_trajec
     # print(f"Node Colors: {node_colors}")
 
     # Calculate node sizes
-    if hide_nodes:
-        # Node sizes set to zero (not shown)
-        node_sizes = [0 for node in G.nodes()]
-    elif use_solution_iterations:
-        # Node sizes based on solution iterations
-        node_sizes = [50 + G.nodes[node]['iterations'] * 20 for node in G.nodes()]
-    else:
-        # Node sizes based on the number of incoming edges (in-degree)
-        node_sizes = [50 + G.in_degree(node) * 50 for node in G.nodes()]
+    node_sizes = []
+    for node in G.nodes():
+        if hide_LON_nodes and "Local Optimum" in node:
+            node_sizes.append(0)
+        elif LON_node_strength and "Local Optimum" in node:
+            incoming_edges = G.in_edges(node, data=True)
+            local_optimum_size = sum(edge_data.get('weight', 0) for _, _, edge_data in incoming_edges)
+            node_sizes.append(50 + local_optimum_size * node_size_slider)
+        elif hide_STN_nodes and "Local Optimum" not in node:
+            node_sizes.append(0)
+        elif use_solution_iterations and "Local Optimum" not in node:
+            node_sizes = [node_size_slider + G.nodes[node]['iterations'] * node_size_slider for node in G.nodes()]
+        else:
+            # Node sizes based on the number of incoming edges (in-degree)
+            node_sizes = [node_size_slider + G.in_degree(node) * node_size_slider for node in G.nodes()]
 
     # Prepare node positions based on selected layout
     if layout == 'mds':

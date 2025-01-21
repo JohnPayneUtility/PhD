@@ -862,7 +862,7 @@ def get_base_OnePlusOneEA(attr_function, mutate_function, fitness_function, true
         'len_sol': n_items, # solution length
         'weights': fit_weights,
         'gens': 1000000, # generation limit
-        'evals': None, # fitness eval limit
+        'evals': 50000, # fitness eval limit
         'target': None, # stopping fitness
         'attr_function': attr_function,
         'mutate_function': mutate_function,
@@ -879,7 +879,7 @@ def get_base_PCEA(attr_function, fitness_function, true_fitness_function, fit_we
     'weights': fit_weights,
     'popsize': 100, # Population size
     'gens': 1000000, # generation limit
-    'evals': None, # fitness eval limit
+    'evals': 50000, # fitness eval limit
     'target': None, # stopping fitness
     'attr_function': attr_function,
     'fitness_function': fitness_function, # algorithm objective function
@@ -895,7 +895,7 @@ def get_base_EA(attr_function, mutate_function, fitness_function, true_fitness_f
     'weights': fit_weights,
     'popsize': 100, # Population size
     'gens': 1000000, # generation limit
-    'evals': None, # fitness eval limit
+    'evals': 50000, # fitness eval limit
     'target': None, # stopping fitness
     'attr_function': attr_function,
     'tournsize': 2, # Tournament selection size
@@ -913,7 +913,7 @@ def get_base_UMDA(attr_function, fitness_function, true_fitness_function, fit_we
     'weights': fit_weights,
     'popsize': 100, # Population size
     'gens': 1000000, # generation limit
-    'evals': None, # fitness eval limit
+    'evals': 50000, # fitness eval limit
     'target': None, # stopping fitness
     'attr_function': attr_function,
     'selectsize': 50, # Size selected for distribution
@@ -974,7 +974,7 @@ if __name__ == "__main__":
         true_fitness_function = (OneMax_fitness, {'noise_intensity': 0})
         
         PCEA_popsize = int(10 * np.sqrt(n_items) * np.log(n_items))
-        mutEA_popsize = int(max(1, noisevalue**2) * np.log(n_items))
+        mutEA_popsize = int(max(1, noisevalue**2) * 10 * np.log(n_items))
         UMDA_popsize = int(20 * np.sqrt(n_items) * np.log(n_items))
 
         # Run PCEA
@@ -998,7 +998,7 @@ if __name__ == "__main__":
         EA_params = get_base_EA(binary_attribute, mutate_function, fitness_function, true_fitness_function, fit_weights, n_items)
         EA_params['popsize'] = mutEA_popsize
         EA_params['evals'] = evalLimit
-        run_exp(EA, EA_params, n_runs, problem_name, problem_info, noisevalue, suffix='BigPop')
+        # run_exp(EA, EA_params, n_runs, problem_name, problem_info, noisevalue, suffix='BigPop')
 
         # Run Mutation population elitism
         EA_params = get_base_EA(binary_attribute, mutate_function, fitness_function, true_fitness_function, fit_weights, n_items)
@@ -1053,7 +1053,7 @@ if __name__ == "__main__":
             EA_params = get_base_EA(binary_attribute, mutate_function, fitness_function, true_fitness_function, fit_weights, n_items)
             EA_params['popsize'] = mutEA_popsize
             EA_params['evals'] = evalLimit
-            run_exp(EA, EA_params, n_runs, problem_name, problem_info, noisevalue, suffix='BigPop')
+            # run_exp(EA, EA_params, n_runs, problem_name, problem_info, noisevalue, suffix='BigPop')
 
             # Run Mutation population elitism
             EA_params = get_base_EA(binary_attribute, mutate_function, fitness_function, true_fitness_function, fit_weights, n_items)
@@ -1063,11 +1063,20 @@ if __name__ == "__main__":
             # run_exp(EA, EA_params, n_runs, problem_name, problem_info, noisevalue, suffix='eliteV2')
     
     # Rastrigin problem
-    # problem_name = 'rastriginN2A10'
-    # n_items = 2
-    # mutate_function = (tools.mutGaussian, {'mu': 0, 'sigma': 0.1, 'indpb': 0.5})
-    # fitness_function = (rastrigin_eval, {'amplitude':10})
-    # fit_weights = (-1.0,)
+    problem_name = 'rastriginN2A5'
+    n_items = 2
+    problem_info = {
+        'n_items': n_items
+    }
+    noisevalue = 0
+    mutate_function = (tools.mutGaussian, {'mu': 0, 'sigma': 0.1, 'indpb': 0.5})
+    fitness_function = (rastrigin_eval, {'amplitude':5})
+    true_fitness_function = (rastrigin_eval, {'amplitude':5})
+    fit_weights = (-1.0,)
+
+    PCEA_params = get_base_PCEA(Rastrigin_attribute, fitness_function, true_fitness_function, fit_weights, n_items)
+    run_exp(PCEA, PCEA_params, n_runs, problem_name, problem_info, noisevalue, suffix='')
+
 
     # HC_params = get_base_HC(Rastrigin_attribute, mutate_function, fitness_function, fit_weights, n_items)
     # run_exp_parallel(HC, HC_params, n_runs_HC, problem_name, problem_info, suffix='') # multithreaded

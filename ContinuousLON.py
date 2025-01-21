@@ -2,8 +2,9 @@ import numpy as np
 from scipy.optimize import basinhopping, minimize
 import os
 import pickle
+from LON_Utilities import convert_to_split_edges_format
 
-def rastrigin_eval(individual, amplitude=5):
+def rastrigin_eval(individual, amplitude=10):
     """
 
     """
@@ -101,7 +102,8 @@ class BasinHoppingCallback:
         return self.local_optima, self.fitness_values, edges_list
 
 # Problem information and data initialisation
-n_dimensions = 2
+n_dimensions = 5
+base_step_size = 0.4749
 # x0 = np.random.uniform(-5.12, 5.12, n_dimensions)
 all_runs_local_optima = []
 all_runs_edges = []
@@ -124,18 +126,19 @@ aggregated_lon_data = {
     "edges": {},
 }
 
-for _ in range(1):  # Multiple runs
+for i in range(100):  # Multiple runs
     x0 = np.random.uniform(-5.12, 5.12, n_dimensions)  # Random start
     callback = BasinHoppingCallback(max_no_improve=1000)
     result = basinhopping(
-        birastrigin_eval,
+        rastrigin_eval,
         x0=np.random.uniform(-5.12, 5.12, n_dimensions),  # Random start
         minimizer_kwargs=minimizer_kwargs,
         niter=10000,  # Maximum basin-hopping iterations
-        stepsize=0.474,
+        stepsize=(2*base_step_size),
         callback=callback,
     )
     results.append(result)
+    print(i)
 
     # Save the local optima and fitnesses for this run
     local_optima, fitness_values, edges_list = callback.get_lon_data()
@@ -171,154 +174,128 @@ for _ in range(1):  # Multiple runs
 # local_optima_data = [all_runs_local_optima, all_runs_fitness_values, all_runs_edges]
 
 # Save local optima data for runs
-folder = 'data/birastriginN2A5'
+aggregated_lon_data_SE = convert_to_split_edges_format(aggregated_lon_data)
+folder = 'data/RastriginN5A10'
 filename = 'MonotonicSequenceBasinHopping'
 save_filename = f'{filename}_LO.pkl'
 save_path = os.path.join(folder, save_filename)
 os.makedirs(folder, exist_ok=True)
 with open(save_path, 'wb') as file:
-        pickle.dump(aggregated_lon_data, file)
+        pickle.dump(aggregated_lon_data_SE, file)
 print(f"Local optima saved to {save_path}")
 
-print(aggregated_lon_data["local_optima"][0])
-print(aggregated_lon_data["fitness_values"][0])
-print(next(iter(aggregated_lon_data["edges"].items())))
-
-# def compress_lon(all_runs_local_optima, all_runs_fitness_values, all_runs_edges, accuracy=1e-4):
-#     """
-#     Compress a Monotonic LON (MLON) into a Compressed Monotonic LON (CMLON).
-
-#     Args:
-#         all_runs_local_optima (list): List of local optima nodes.
-#         all_runs_fitness_values (list): List of fitness values corresponding to the local optima.
-#         all_runs_edges (list of tuples): List of edges where each tuple is (source, target).
-#         accuracy (float): Accuracy threshold to group fitness values as equal.
-
-#     Returns:
-#         tuple: (compressed_nodes, compressed_edges, compressed_fitness_values)
-#             compressed_nodes: List of compressed local optima (sets of original nodes).
-#             compressed_edges: List of edges (source, target, count of transitions) for the CMLON.
-#             compressed_fitness_values: List of fitness values corresponding to the compressed nodes.
-#     """
-#     # Step 1: Group local optima by fitness value within the given accuracy
-#     compressed_nodes = []
-#     compressed_fitness_values = []
-#     fitness_to_node_map = {}
-
-#     for idx, fitness in enumerate(all_runs_fitness_values):
-#         found_group = False
-#         for key_fitness, group in fitness_to_node_map.items():
-#             if abs(fitness - key_fitness) <= accuracy:
-#                 group.append(idx)
-#                 found_group = True
-#                 break
-#         if not found_group:
-#             fitness_to_node_map[fitness] = [idx]
-
-#     # Create compressed nodes as sets of original nodes
-#     for key_fitness, group in fitness_to_node_map.items():
-#         compressed_nodes.append(set(group))
-#         compressed_fitness_values.append(key_fitness)
-
-#     # Step 2: Aggregate edges between compressed nodes
-#     compressed_edges = {}
-
-#     for source, target in all_runs_edges:
-#         # Find the indices of source and target in all_runs_local_optima
-#         source_idx = next((i for i, node in enumerate(all_runs_local_optima) if np.allclose(node, source, atol=accuracy)), None)
-#         target_idx = next((i for i, node in enumerate(all_runs_local_optima) if np.allclose(node, target, atol=accuracy)), None)
-
-#         if source_idx is None or target_idx is None:
-#             continue
-
-#         # Find the compressed nodes containing the source and target
-#         source_group = next(group for group in compressed_nodes if source_idx in group)
-#         target_group = next(group for group in compressed_nodes if target_idx in group)
-
-#         # Create a unique key for the edge
-#         edge_key = (frozenset(source_group), frozenset(target_group))
-
-#         # Count the transitions
-#         if edge_key in compressed_edges:
-#             compressed_edges[edge_key] += 1
-#         else:
-#             compressed_edges[edge_key] = 1
-
-#     # Convert edge dictionary back to a list
-#     compressed_edges_list = [(list(edge[0]), list(edge[1]), count) for edge, count in compressed_edges.items()]
-
-#     return compressed_nodes, compressed_fitness_values, compressed_edges_list
-
-# compressed_local_optima_data = compress_lon(all_runs_local_optima[0], all_runs_fitness_values[0], all_runs_edges[0], accuracy=1e-5)
-# compressed_local_optima_data = compress_lon(all_runs_local_optima, all_runs_fitness_values, all_runs_edges, accuracy=1e-5)
-
-def compress_lon(aggregated_lon_data, accuracy=1e-5):
+def compress_lon_aggregated(LON_data, accuracy=1e-5):
     """
-    Compress a Landscape of Optima Network (LON) by condensing nodes with similar fitness values.
+    Compress a Landscape of Optima Network (LON) by combining local optima with
+    fitness values within a given accuracy threshold, aggregating edges accordingly.
 
     Args:
-        aggregated_lon_data (dict): Dictionary containing LON data with keys:
-            - "local_optima": List of unique local optima.
-            - "fitness_values": List of fitness values corresponding to the local optima.
-            - "edges": Dictionary of edges with their weights {(source, target): weight}.
-        accuracy (float): Accuracy threshold for grouping nodes with similar fitness values.
+        LON_data (dict): Dictionary containing LON data with keys:
+            - "local_optima": List of unique local optima (each a tuple).
+            - "fitness_values": List of fitness values (float or int) corresponding to the local optima.
+            - "edges": Dictionary with keys as (source, target) tuples (each source/target a tuple),
+                       and values as numeric edge weights.
+        accuracy (float): Threshold for grouping local optima with close fitness values.
 
     Returns:
-        dict: Compressed LON data in the same format as the input.
+        dict: A new LON dictionary with the same format and types, but aggregated
+              according to the provided accuracy.
     """
-    # Initialize compressed LON data
+
+    # ----------------------------------------------------
+    # 1. Group local optima based on fitness similarity
+    # ----------------------------------------------------
+    grouped_optima = []          # Representative local optima for each group
+    grouped_fitness_values = []  # Representative fitness for each group
+    membership = []              # For each original local optimum, which group does it belong to?
+
+    for opt, fit in zip(LON_data["local_optima"], LON_data["fitness_values"]):
+        assigned_group = None
+        # Check if this fitness is close enough to a group representative's fitness
+        for g_idx, g_fit in enumerate(grouped_fitness_values):
+            if abs(fit - g_fit) <= accuracy:
+                assigned_group = g_idx
+                break
+
+        # If not found in any group, create a new group
+        if assigned_group is None:
+            grouped_optima.append(opt)
+            grouped_fitness_values.append(fit)
+            assigned_group = len(grouped_optima) - 1
+
+        membership.append(assigned_group)
+
+    # ----------------------------------------------------
+    # 2. Build a new edge dictionary based on the groups
+    # ----------------------------------------------------
+    # map each original local optimum to an index to easily find its group
+    opt_to_index = {opt: i for i, opt in enumerate(LON_data["local_optima"])}
+
+    new_edges = {}
+    for (source, target), weight in LON_data["edges"].items():
+        # Identify the groups of the source and target
+        source_group = membership[opt_to_index[source]]
+        target_group = membership[opt_to_index[target]]
+
+        # The new source/target in the aggregated LON
+        new_source = grouped_optima[source_group]
+        new_target = grouped_optima[target_group]
+
+        # Aggregate edge weights if the same group-pair already exists
+        if (new_source, new_target) not in new_edges:
+            new_edges[(new_source, new_target)] = weight
+        else:
+            new_edges[(new_source, new_target)] += weight
+
+    # ----------------------------------------------------
+    # 3. Construct the new, aggregated LON data structure
+    # ----------------------------------------------------
     compressed_lon_data = {
-        "local_optima": [],
-        "fitness_values": [],
-        "edges": {},
+        "local_optima": grouped_optima,
+        "fitness_values": grouped_fitness_values,
+        "edges": new_edges,
     }
 
-    # Map to track which local optima are grouped together
-    fitness_to_group = {}
-    group_to_optima = []
-
-    # Group nodes by fitness values within the given accuracy
-    for opt, fitness in zip(aggregated_lon_data["local_optima"], aggregated_lon_data["fitness_values"]):
-        found_group = False
-        for group_idx, group_fitness in enumerate(compressed_lon_data["fitness_values"]):
-            if abs(fitness - group_fitness) <= accuracy:
-                # Add to existing group
-                fitness_to_group[opt] = group_idx
-                group_to_optima[group_idx].append(opt)
-                found_group = True
-                break
-        if not found_group:
-            # Create a new group
-            group_idx = len(compressed_lon_data["local_optima"])
-            compressed_lon_data["local_optima"].append(opt)
-            compressed_lon_data["fitness_values"].append(fitness)
-            group_to_optima.append([opt])
-            fitness_to_group[opt] = group_idx
-
-    # Aggregate edges between compressed nodes
-    for (source, target), weight in aggregated_lon_data["edges"].items():
-        # print(source)
-        # print(target)
-        # print(weight)
-        source_group = fitness_to_group[source]
-        target_group = fitness_to_group[target]
-
-        # Create an edge between the compressed groups
-        compressed_edge = (source_group, target_group)
-        if compressed_edge in compressed_lon_data["edges"]:
-            compressed_lon_data["edges"][compressed_edge] += weight
-        else:
-            compressed_lon_data["edges"][compressed_edge] = weight
+    # ----------------------------------------------------
+    # 4. Validate output to ensure it matches required format
+    # ----------------------------------------------------
+    assert isinstance(compressed_lon_data, dict), "Output must be a dictionary."
+    assert "local_optima" in compressed_lon_data, "Output dictionary must contain 'local_optima'."
+    assert "fitness_values" in compressed_lon_data, "Output dictionary must contain 'fitness_values'."
+    assert "edges" in compressed_lon_data, "Output dictionary must contain 'edges'."
+    assert all(isinstance(opt, tuple) for opt in compressed_lon_data["local_optima"]), \
+        "All local optima in 'local_optima' must be tuples."
+    assert all(isinstance(f, (float, int)) for f in compressed_lon_data["fitness_values"]), \
+        "All values in 'fitness_values' must be numeric."
+    assert all(
+        isinstance(k, tuple) and len(k) == 2 
+        and isinstance(k[0], tuple) and isinstance(k[1], tuple)
+        for k in compressed_lon_data["edges"].keys()
+    ), "All edge keys must be 2-tuples of solutions (which are tuples)."
+    assert all(isinstance(v, (float, int)) for v in compressed_lon_data["edges"].values()), \
+        "All edge weights must be numeric."
 
     return compressed_lon_data
 
-compressed_lon_data = compress_lon(aggregated_lon_data, accuracy=1e-4)
+compressed_lon_data = compress_lon_aggregated(aggregated_lon_data, accuracy=1e-4)
+compressed_lon_data_SE = convert_to_split_edges_format(compressed_lon_data)
 save_filename = f'{filename}_CLO.pkl'
 save_path = os.path.join(folder, save_filename)
 os.makedirs(folder, exist_ok=True)
 with open(save_path, 'wb') as file:
-        pickle.dump(compressed_lon_data, file)
+        pickle.dump(compressed_lon_data_SE, file)
 print(f"Compressed Local optima saved to {save_path}")
 
 print(len(aggregated_lon_data["local_optima"]))
 print(len(compressed_lon_data["local_optima"]))
+
+# print(aggregated_lon_data)
+
+print("Local Optima Sample:", aggregated_lon_data["local_optima"][:3])
+print("Fitness Values Sample:", aggregated_lon_data["fitness_values"][:3])
+# Check edges or edge transitions and weights
+if "edges" in aggregated_lon_data:
+    print("Edges Sample:", list(aggregated_lon_data["edges"].items())[:3])
+elif "edge_transitions" in aggregated_lon_data and "edge_weights" in aggregated_lon_data:
+    print("Edge Transitions Sample:", aggregated_lon_data["edge_transitions"][:3])
+    print("Edge Weights Sample:", aggregated_lon_data["edge_weights"][:3])
