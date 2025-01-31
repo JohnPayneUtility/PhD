@@ -12,6 +12,11 @@ import json
 
 from LON_Utilities import convert_to_single_edges_format
 
+def convert_to_rgba(color, opacity=1.0):
+    from matplotlib.colors import to_rgba
+    rgba = to_rgba(color, alpha=opacity)
+    return f"rgba({int(rgba[0]*255)}, {int(rgba[1]*255)}, {int(rgba[2]*255)}, {rgba[3]})"
+
 # Function to calculate Hamming distance
 def hamming_distance(sol1, sol2):
     return sum(el1 != el2 for el1, el2 in zip(sol1, sol2))
@@ -189,6 +194,7 @@ app.layout = html.Div([
         id='y-slider-container',  # Add an ID for the container
         style={'display': 'none'}  # Initially hidden
     ),
+    html.Label("Node size scaling:"),
     dcc.Slider(
     id='node-size-slider',
     min=1,
@@ -198,6 +204,7 @@ app.layout = html.Div([
     marks={i: str(i) for i in range(1, 101, 10)},
     tooltip={"placement": "bottom", "always_visible": False}
     ),
+    html.Label("LON Edge thickness:"),
     dcc.Slider(
     id='LON-edge-size-slider',
     min=1,
@@ -207,6 +214,7 @@ app.layout = html.Div([
     marks={i: str(i) for i in range(1, 100, 10)},
     tooltip={"placement": "bottom", "always_visible": False}
     ),
+    html.Label("STN Edge Thickness:"),
     dcc.Slider(
     id='STN-edge-size-slider',
     min=1,
@@ -215,6 +223,42 @@ app.layout = html.Div([
     value=50,  # Default scaling factor
     marks={i: str(i) for i in range(1, 101, 10)},
     tooltip={"placement": "bottom", "always_visible": False}
+    ),
+    html.Label("Local Optima Node Opacity:"),
+    dcc.Slider(
+        id='local-optima-node-opacity-slider',
+        min=0.0,
+        max=1.0,
+        step=0.1,
+        value=1.0,
+        marks={i/10: f"{i/10:.1f}" for i in range(1, 11)},
+    ),
+    html.Label("Local Optima Edge Opacity:"),
+    dcc.Slider(
+        id='local-optima-edge-opacity-slider',
+        min=0.0,
+        max=1.0,
+        step=0.1,
+        value=1.0,
+        marks={i/10: f"{i/10:.1f}" for i in range(1, 11)},
+    ),
+    html.Label("Other Node Opacity:"),
+    dcc.Slider(
+        id='STN-node-opacity-slider',
+        min=0.0,
+        max=1.0,
+        step=0.1,
+        value=1.0,
+        marks={i/10: f"{i/10:.1f}" for i in range(1, 11)},
+    ),
+    html.Label("Other Edge Opacity:"),
+    dcc.Slider(
+        id='STN-edge-opacity-slider',
+        min=0.0,
+        max=1.0,
+        step=0.1,
+        value=1.0,
+        marks={i/10: f"{i/10:.1f}" for i in range(1, 11)},
     ),
     dcc.Graph(id='trajectory-plot'),
     dcc.Store(id='algo-info'),
@@ -368,9 +412,13 @@ def update_algo_info(all_info_files_list):
      Input('y-axis-slider', 'value'),
      Input('node-size-slider', 'value'),
      Input('LON-edge-size-slider', 'value'),
-     Input('STN-edge-size-slider', 'value')]
+     Input('STN-edge-size-slider', 'value'),
+     Input('local-optima-node-opacity-slider', 'value'),
+     Input('local-optima-edge-opacity-slider', 'value'),
+     Input('STN-node-opacity-slider', 'value'),
+     Input('STN-edge-opacity-slider', 'value')]
 )
-def update_plot(options, run_options, layout_value, hover_info_value, all_trajectories_list, n_runs_display, local_optima, use_range_slider, x_slider, y_slider, node_size_slider, LON_edge_size_slider, STN_edge_size_slider):
+def update_plot(options, run_options, layout_value, hover_info_value, all_trajectories_list, n_runs_display, local_optima, use_range_slider, x_slider, y_slider, node_size_slider, LON_edge_size_slider, STN_edge_size_slider, LON_node_opac, LON_edge_opac, STN_node_opac, STN_edge_opac):
     # Options from checkboxes
     show_labels = 'show_labels' in options
     hide_STN_nodes = 'hide_STN_nodes' in options
@@ -517,13 +565,13 @@ def update_plot(options, run_options, layout_value, hover_info_value, all_trajec
     node_colors = []
     for node in G.nodes():
         if node == overall_best_node:
-            node_colors.append('red')
+            node_colors.append(convert_to_rgba('red'))
         elif node in start_nodes:
-            node_colors.append('yellow')
+            node_colors.append(convert_to_rgba('yellow'))
         elif node in end_nodes:
-            node_colors.append('grey')
+            node_colors.append(convert_to_rgba('grey'))
         elif "Local Optimum" in node:
-            node_colors.append(local_optima_color)
+            node_colors.append(convert_to_rgba(local_optima_color, LON_node_opac))
         else:
             # Check if the node exists in multiple sets of trajectories
             solution_tuple = next(key for key, value in node_mapping.items() if value == node)
@@ -533,9 +581,9 @@ def update_plot(options, run_options, layout_value, hover_info_value, all_trajec
                     if solution_tuple in set(tuple(sol) for sol in unique_solutions):
                         count_in_sets += 1
             if count_in_sets > 1:
-                node_colors.append(node_color_shared)
+                node_colors.append(convert_to_rgba(node_color_shared))
             else:
-                node_colors.append('skyblue')
+                node_colors.append(convert_to_rgba('skyblue', STN_node_opac))
     # print(f"Node Colors: {node_colors}")
 
     # Calculate node sizes
@@ -641,7 +689,7 @@ def update_plot(options, run_options, layout_value, hover_info_value, all_trajec
                 y=[y0, y1],
                 z=[z0, z1],
                 mode='lines',
-                line=dict(width=weight * 1, color=edge[2].get('color', 'black')),
+                line=dict(width=weight * 1, color=convert_to_rgba(edge[2].get('color', 'black'), STN_edge_opac)),
                 hoverinfo='none'
             )
             fig.add_trace(trace)
