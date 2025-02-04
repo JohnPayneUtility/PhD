@@ -17,6 +17,19 @@ def convert_to_rgba(color, opacity=1.0):
     rgba = to_rgba(color, alpha=opacity)
     return f"rgba({int(rgba[0]*255)}, {int(rgba[1]*255)}, {int(rgba[2]*255)}, {rgba[3]})"
 
+def fitness_to_color(fitness, min_fitness, max_fitness, alpha):
+        # Normalize fitness value to a 0-1 scale
+        if max_fitness == min_fitness:
+            ratio = 0.5
+        else:
+            ratio = (fitness - min_fitness) / (max_fitness - min_fitness)
+        # Define colors for the extremes
+        low_rgb = np.array([0, 0, 255])   # Blue
+        high_rgb = np.array([0, 255, 0])    # Green
+        rgb = low_rgb + ratio * (high_rgb - low_rgb)
+        rgb = rgb.astype(int)
+        return f'rgba({rgb[0]}, {rgb[1]}, {rgb[2]}, {alpha})'
+
 # Function to calculate Hamming distance
 def hamming_distance(sol1, sol2):
     return sum(el1 != el2 for el1, el2 in zip(sol1, sol2))
@@ -129,7 +142,8 @@ app.layout = html.Div([
             {'label': 'Hide LON Nodes', 'value': 'hide_LON_nodes'},
             {'label': '3D Plot', 'value': 'plot_3D'},
             {'label': 'Use Solution Iterations', 'value': 'use_solution_iterations'},
-            {'label': 'Use strength for LON node size', 'value': 'LON_node_strength'}
+            {'label': 'Use strength for LON node size', 'value': 'LON_node_strength'},
+            {'label': 'Colour LON by fitness', 'value': 'local_optima_color'}
         ],
         value=[]
     ),
@@ -426,6 +440,7 @@ def update_plot(options, run_options, layout_value, hover_info_value, all_trajec
     plot_3D = 'plot_3D' in options
     use_solution_iterations = 'use_solution_iterations' in options
     LON_node_strength = 'LON_node_strength' in options
+    local_optima_color = 'local_optima_color' in options
 
     # Run options
     show_best = 'show_best' in run_options
@@ -441,7 +456,6 @@ def update_plot(options, run_options, layout_value, hover_info_value, all_trajec
     # Colors for different sets of trajectories
     # algo_colors = ['blue', 'orange', 'purple', 'brown', 'cyan', 'magenta']
     node_color_shared = 'green'
-    local_optima_color = 'black'
 
     # Add nodes and edges for each set of trajectories
     node_mapping = {}  # To ensure unique solutions map to the same node
@@ -543,16 +557,24 @@ def update_plot(options, run_options, layout_value, hover_info_value, all_trajec
     if not all_trajectories_list:
         optimisation_goal = 'max'
     
-    # if local_optima:
-    #     local_optima_solutions, local_optima_fitnesses, local_optima_edges = local_optima
-    #     if optimisation_goal == "max":
-    #         local_optima_best_fitness = max(local_optima_fitnesses)
-    #         if local_optima_best_fitness > overall_best_fitness:
-    #             overall_best_fitness = local_optima_best_fitness
-    #     else:  # Minimization
-    #         local_optima_best_fitness = min(local_optima_fitnesses)
-    #         if local_optima_best_fitness < overall_best_fitness:
-    #             overall_best_fitness = local_optima_best_fitness
+    # Calculate local optima fitness ranges
+    local_optima_nodes = [node for node in G.nodes() if "Local Optimum" in node]
+    if local_optima_nodes:
+        local_optima_fitnesses = [G.nodes[node]['fitness'] for node in local_optima_nodes]
+        if optimisation_goal == "max":
+            min_lo_fitness = min(local_optima_fitnesses)
+            max_lo_fitness = max(local_optima_fitnesses)
+            if max_lo_fitness > overall_best_fitness:
+                overall_best_fitness = max_lo_fitness
+        else:
+            # If optimisation goal is minimisation
+            min_lo_fitness = max(local_optima_fitnesses)
+            max_lo_fitness = min(local_optima_fitnesses)
+            if max_lo_fitness < overall_best_fitness:
+                overall_best_fitness = max_lo_fitness
+    else:
+        # Fallback values if no local optima exist (won't be used if there are none)
+        min_lo_fitness = max_lo_fitness = None
 
     # Find the overall best node
     for node, data in G.nodes(data=True):
@@ -571,7 +593,11 @@ def update_plot(options, run_options, layout_value, hover_info_value, all_trajec
         elif node in end_nodes:
             node_colors.append(convert_to_rgba('grey'))
         elif "Local Optimum" in node:
-            node_colors.append(convert_to_rgba(local_optima_color, LON_node_opac))
+            if local_optima_color:
+                fitness = G.nodes[node]['fitness']
+                node_colors.append(fitness_to_color(fitness, min_lo_fitness, max_lo_fitness, LON_node_opac))
+            else:
+                node_colors.append(convert_to_rgba('black', LON_node_opac))
         else:
             # Check if the node exists in multiple sets of trajectories
             solution_tuple = next(key for key, value in node_mapping.items() if value == node)
