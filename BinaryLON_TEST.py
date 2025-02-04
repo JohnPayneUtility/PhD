@@ -309,13 +309,13 @@ def compress_lon_aggregated(LON_data, accuracy=1e-5):
 problem_names = [
         # 'f1_l-d_kp_10_269',
         # 'f2_l-d_kp_20_878',
-        'f3_l-d_kp_4_20',
-        'f4_l-d_kp_4_11',
+        # 'f3_l-d_kp_4_20',
+        # 'f4_l-d_kp_4_11',
         # 'f5_l-d_kp_15_375',
         # 'f6_l-d_kp_10_60',
         # 'f7_l-d_kp_7_50',
         # 'f8_l-d_kp_23_10000',
-        # 'f9_l-d_kp_5_80',
+        'f9_l-d_kp_5_80',
         # 'f10_l-d_kp_20_879',
         # 'knapPI_1_100_1000_1',
         # 'knapPI_2_100_1000_1',
@@ -334,7 +334,7 @@ for problem_name in problem_names:
         "edges": {},
         }
     
-    for i in trange(10):
+    for i in trange(500):
         local_optima, fitness_values, edges_list = BinaryLON(1000, n_items, fit_weights, attr_function=binary_attribute, n_flips_mut=2, n_flips_pert=4, mutate_function=None, perturb_function=None, improv_method='best', fitness_function=fitness_function, starting_solution=None, true_fitness_function=None)
         # print(local_optima)
         # print(fitness_values)
