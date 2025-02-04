@@ -525,8 +525,37 @@ def update_plot(options, run_options, layout_value, hover_info_value, all_trajec
             )
     
     # Add local optima nodes if provided
+    def filter_negative_LO(local_optima):
+        # Create filtered lists for nodes and fitness values.
+        filtered_nodes = []
+        filtered_fitness_values = []
+        
+        # Loop through nodes and their fitness values, keeping only non-negative ones.
+        for opt, fitness in zip(local_optima["local_optima"], local_optima["fitness_values"]):
+            if fitness >= 0:
+                filtered_nodes.append(opt)
+                filtered_fitness_values.append(fitness)
+        
+        # Create a set of allowed node tuples for filtering edges.
+        allowed_nodes = {tuple(opt) for opt in filtered_nodes}
+        
+        # Filter the edges so that both source and target are in the allowed set.
+        filtered_edges = {}
+        for (source, target), weight in local_optima["edges"].items():
+            if tuple(source) in allowed_nodes and tuple(target) in allowed_nodes:
+                filtered_edges[(source, target)] = weight
+
+        # Create a new dataset with the filtered data.
+        filtered_local_optima = {
+            "local_optima": filtered_nodes,
+            "fitness_values": filtered_fitness_values,
+            "edges": filtered_edges
+        }
+        return filtered_local_optima
+    
     if local_optima:
         local_optima = convert_to_single_edges_format(local_optima)
+        local_optima = filter_negative_LO(local_optima)
         print(len(local_optima["local_optima"]))
 
         max_weight = max(local_optima["edges"].values(), default=1)
