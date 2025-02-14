@@ -16,6 +16,7 @@ import pandas as pd
 from datetime import datetime
 
 from tqdm import trange
+from tqdm import tqdm
 
 from concurrent.futures import ProcessPoolExecutor
 import multiprocessing
@@ -446,6 +447,86 @@ def OnePlusOneEA(len_sol, weights, gens=None, evals=None, target=None, attr_func
 
     return all_generations, best_solutions, best_fitnesses, true_fitnesses
 
+def MuPlusOneEA(len_sol, mu, weights, gens=None, evals=None, target=None, 
+                attr_function=None, mutate_function=None, fitness_function=None, 
+                starting_solution=None, true_fitness_function=None):
+    """
+    Implements the (mu+1) Evolutionary Algorithm.
+
+    Parameters:
+    - len_sol: Length of the binary solution
+    - mu: Population size (number of individuals)
+    - weights: Optimization direction (1 for maximization, -1 for minimization)
+    - gens: Number of generations (optional)
+    - evals: Maximum evaluations (optional)
+    - attr_function: Function to generate an individual
+    - mutate_function: Mutation function
+    - fitness_function: Function to evaluate fitness
+    - starting_solution: Optional initial solution
+    - true_fitness_function: For tracking true fitness (optional)
+    """
+
+    # Fitness and individual creators
+    if not hasattr(creator, "CustomFitness"):
+        creator.create("CustomFitness", base.Fitness, weights=weights)
+    if not hasattr(creator, "Individual"):
+        creator.create("Individual", list, fitness=creator.CustomFitness)
+
+    # Define DEAP toolbox
+    toolbox = base.Toolbox()
+    toolbox.register("attribute", attr_function)
+    toolbox.register("individual", tools.initRepeat, creator.Individual, toolbox.attribute, n=len_sol)
+    toolbox.register("population", tools.initRepeat, list, toolbox.individual)
+    toolbox.register("evaluate", lambda ind: fitness_function[0](ind, **fitness_function[1]))
+    toolbox.register("mutate", lambda ind: mutate_function[0](ind, **mutate_function[1]))
+
+    # Create initial population of size mu
+    population = toolbox.population(n=mu)
+
+    # If a starting solution is provided, initialize individuals with it
+    if starting_solution is not None:
+        for ind in population:
+            ind[:] = starting_solution[:]
+
+    # Evaluate the initial population
+    for ind in population:
+        ind.fitness.values = toolbox.evaluate(ind)
+    runtime = mu
+
+    # Data recording
+    all_generations, best_solutions, best_fitnesses, true_fitnesses = ([] for _ in range(4))
+    data = [all_generations, best_solutions, best_fitnesses, true_fitnesses]
+    
+    record_population_state(data, population, toolbox, true_fitness_function)
+
+    # Evolutionary loop
+    gen = 0
+    while gen < gens:
+        gen += 1
+
+        # Select a random parent from the population
+        parent = random.choice(population)
+
+        # Generate an offspring by mutating the selected parent
+        offspring = toolbox.clone(parent)
+        offspring, = toolbox.mutate(offspring)
+
+        del offspring.fitness.values  # Remove fitness to force reevaluation
+        offspring.fitness.values = toolbox.evaluate(offspring)
+        runtime += 1
+
+        # Add offspring to the population
+        population.append(offspring)
+
+        # Remove the worst individual to maintain population size
+        population.remove(min(population, key=lambda ind: ind.fitness.values))
+
+        record_population_state(data, population, toolbox, true_fitness_function)
+
+        if evals is not None and runtime >= evals:
+            return all_generations, best_solutions, best_fitnesses, true_fitnesses
+
+    return all_generations, best_solutions, best_fitnesses, true_fitnesses
 
 # EA
 def EA(len_sol, weights, popsize, gens=None, evals=None, target=None, attr_function=None, tournsize=2, mutate_function=None, fitness_function=None, starting_solution=None, true_fitness_function=None, n_elite=0):
@@ -878,7 +959,7 @@ def get_base_HC(attr_function, mutate_function, fitness_function, true_fitness_f
 
 def get_base_OnePlusOneEA(attr_function, mutate_function, fitness_function, true_fitness_function, fit_weights, n_items):
     ss = generate_zero_solution(n_items)
-    HC_params = {
+    params = {
         'len_sol': n_items, # solution length
         'weights': fit_weights,
         'gens': 1000000, # generation limit
@@ -890,7 +971,24 @@ def get_base_OnePlusOneEA(attr_function, mutate_function, fitness_function, true
         'starting_solution': None, # Specified starting solution for all individuals
         'true_fitness_function': true_fitness_function, # noise-less fitness function for performance evaluation
     }
-    return HC_params
+    return params
+
+def get_base_MuPlusOneEA(attr_function, mutate_function, fitness_function, true_fitness_function, fit_weights, n_items):
+    ss = generate_zero_solution(n_items)
+    params = {
+        'len_sol': n_items, # solution length
+        'weights': fit_weights,
+        'mu': 100, # Population
+        'gens': 1000000, # generation limit
+        'evals': 50000, # fitness eval limit
+        'target': None, # stopping fitness
+        'attr_function': attr_function,
+        'mutate_function': mutate_function,
+        'fitness_function': fitness_function, # algorithm objective function
+        'starting_solution': None, # Specified starting solution for all individuals
+        'true_fitness_function': true_fitness_function, # noise-less fitness function for performance evaluation
+    }
+    return params
 
 def get_base_PCEA(attr_function, fitness_function, true_fitness_function, fit_weights, n_items):
     ss = generate_zero_solution(n_items)
@@ -1002,6 +1100,9 @@ if __name__ == "__main__":
     # HC_params = get_base_HC(binary_attribute, HC_mutate, HC_fitness_function, HC_fitness_function, fit_weights, n_items)
     # run_exp(HC, HC_params, n_runs_HC, problem_name, problem_info, 0, suffix='')
 
+    # tqdm_len = len(OneMaxEvalsWithZero)
+    progress_bar = tqdm(total=len(OneMaxEvalsWithZero), desc="running for noise val")
+
     for evalLimit, noisevalue in zip(OneMaxEvalsWithZero, noise_values_with_zero):
 
         mutation_rate = 1 / (n_items)
@@ -1034,14 +1135,23 @@ if __name__ == "__main__":
         EA_params = get_base_EA(binary_attribute, mutate_function, fitness_function, true_fitness_function, fit_weights, n_items)
         EA_params['popsize'] = mutEA_popsize
         EA_params['evals'] = evalLimit
-        run_exp(EA, EA_params, n_runs, problem_name, problem_info, noise_type, noisevalue, suffix='')
+        # run_exp(EA, EA_params, n_runs, problem_name, problem_info, noise_type, noisevalue, suffix='')
 
         # Run Mutation population elitism
         EA_params = get_base_EA(binary_attribute, mutate_function, fitness_function, true_fitness_function, fit_weights, n_items)
         EA_params['popsize'] = mutEA_popsize
         EA_params['n_elite'] = int(max(1,(mutEA_popsize/10)))
         EA_params['evals'] = evalLimit
-        run_exp(EA, EA_params, n_runs, problem_name, problem_info, noise_type, noisevalue, suffix='elite')
+        # run_exp(EA, EA_params, n_runs, problem_name, problem_info, noise_type, noisevalue, suffix='elite')
+
+        # Mu + 1 EA
+        MuPlusOneParams = get_base_MuPlusOneEA(binary_attribute, mutate_function, fitness_function, true_fitness_function, fit_weights, n_items)
+        MuPlusOneParams['evals'] = evalLimit
+        MuPlusOneParams['mu'] = mutEA_popsize
+        run_exp(MuPlusOneEA, MuPlusOneParams, n_runs, problem_name, problem_info, noise_type, noisevalue, suffix='')
+
+        progress_bar.update(1)
+    progress_bar.close()
 
 
     # KP problems
