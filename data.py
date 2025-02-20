@@ -8,6 +8,7 @@ from deap import creator
 from deap import tools
 
 from ProblemScripts import load_problem_KP
+from FitnessFunctions import *
 
 import os
 import pickle
@@ -78,73 +79,6 @@ def complementary_crossover(parent1, parent2):
 
     return offspring1, offspring2
 
-def OneMax_fitness(individual, noise_function=None, noise_intensity=0):
-    """ Function calculates fitness for OneMax problem individual """
-    if noise_function is not None: # Provide noise function for noise applied to individual
-        individual = noise_function(individual[:], noise_intensity)
-        fitness = sum(individual)
-    else: # standard noisy
-        fitness = sum(individual) + random.gauss(0, noise_intensity)
-    return (fitness,)
-
-def eval_ind_kp(individual, items_dict, capacity, penalty=1):
-    """ Function calculates fitness for knapsack problem individual """
-    n_items = len(individual)
-    weight = sum(items_dict[i][1] * individual[i] for i in range(n_items)) # Calc solution weight
-    value = sum(items_dict[i][0] * individual[i] for i in range(n_items)) # Calc solution value
-    
-    # Check if over capacity and return reduced value
-    if weight > capacity:
-        if penalty == 1:
-            value_with_penalty = capacity - weight
-            return (value_with_penalty,)
-        else:
-            return (0,)
-    return (value,) # Not over capacity return value
-
-def eval_noisy_kp_v1(individual, items_dict, capacity, noise_intensity=0, penalty=1):
-    """ Function calculates fitness for knapsack problem individual """
-    n_items = len(individual)
-    weight = sum(items_dict[i][1] * individual[i] for i in range(n_items)) # Calc solution weight
-    value = sum(items_dict[i][0] * individual[i] for i in range(n_items)) # Calc solution value
-    
-    noise = random.gauss(0, noise_intensity)
-    weight = weight + noise
-
-    # Check if over capacity and return reduced value
-    if weight > capacity:
-        if penalty == 1:
-            value_with_penalty = capacity - weight
-            return (value_with_penalty,)
-        else:
-            return (0,)
-    return (value,) # Not over capacity return value
-
-def eval_noisy_kp_v2(individual, items_dict, capacity, noise_intensity=0, penalty=1):
-    """ Function calculates fitness for knapsack problem individual """
-    n_items = len(individual)
-    weight = sum(items_dict[i][1] * individual[i] for i in range(n_items)) # Calc solution weight
-    value = sum(items_dict[i][0] * individual[i] for i in range(n_items)) # Calc solution value
-    
-    noise = random.gauss(0, noise_intensity)
-    value = value + noise
-
-    # Check if over capacity and return reduced value
-    if (weight + noise) > capacity:
-        if penalty == 1:
-            value_with_penalty = capacity - weight
-            return (value_with_penalty,)
-        else:
-            return (0,)
-    return (value,) # Not over capacity return value
-
-def rastrigin_eval(individual, amplitude=5):
-    # print(f"Evaluating individual: {individual}")
-    # print(f"Types in individual: {[type(x) for x in individual]}")
-    A = amplitude
-    n = len(individual)
-    fitness = A * n + sum((x ** 2 - A * np.cos(2 * np.pi * x)) for x in individual),
-    return fitness
 
 # Population recording
 def record_population_state(data, population, toolbox, true_fitness_function):
@@ -881,46 +815,31 @@ def run_exp(algo, parameters, n_runs, problem_name, problem_info, noise_type, no
     save_parameters(parameters, problem_name, name)
     save_problem(problem_info, problem_name)
 
+# MULTITHREADED CODE
 
-# problem_name = 'rastriginN2A10'
-
-
-# attr_function = (random.uniform, -5.12, 5.12) # attribute function for rastrigin
-# attr_function = (random.randint, 0, 1) # binary attribute function
-
-# mutate_function = (tools.mutGaussian, {'mu': 0, 'sigma': 0.1, 'indpb': 0.05})
-# mutate_function = (tools.mutGaussian, {'mu': 0, 'sigma': 0.1, 'indpb': 0.5})
-# mutate_function = (tools.mutFlipBit, {'indpb': 0.01})
-
-# fitness_function = (OneMax_fitness, {'noise_function': random_bit_flip, 'noise_intensity': 50})
-# fitness_function = (rastrigin_eval, {'amplitude':10})
-# fitness_function_true = (OneMax_fitness, {})
-# fitness_function = (eval_ind_kp, {'items_dict': items_dict, 'capacity': capacity, 'penalty': 1})
-
-
-def run_algorithm(args):
-    """Wrapper function to run a single algorithm instance."""
-    algorithm_function, param_dict = args
-    all_generations, best_solutions, best_fitnesses, true_fitnesses = algorithm_function(**param_dict)
-    unique_solutions, unique_fitnesses, solution_iterations = extract_trajectory_data(best_solutions, true_fitnesses)
-    transitions = extract_transitions(unique_solutions)
+# def run_algorithm(args):
+#     """Wrapper function to run a single algorithm instance."""
+#     algorithm_function, param_dict = args
+#     all_generations, best_solutions, best_fitnesses, true_fitnesses = algorithm_function(**param_dict)
+#     unique_solutions, unique_fitnesses, solution_iterations = extract_trajectory_data(best_solutions, true_fitnesses)
+#     transitions = extract_transitions(unique_solutions)
     
-    return unique_solutions, unique_fitnesses, solution_iterations, transitions
+#     return unique_solutions, unique_fitnesses, solution_iterations, transitions
 
-def conduct_runs_parallel(num_runs, algorithm_function, param_dict):
-    """Conducts multiple algorithm runs in parallel."""
-    args = [(algorithm_function, param_dict) for _ in range(num_runs)]
-    with ProcessPoolExecutor(max_workers=multiprocessing.cpu_count()) as executor:
-        results = list(executor.map(run_algorithm, args))
+# def conduct_runs_parallel(num_runs, algorithm_function, param_dict):
+#     """Conducts multiple algorithm runs in parallel."""
+#     args = [(algorithm_function, param_dict) for _ in range(num_runs)]
+#     with ProcessPoolExecutor(max_workers=multiprocessing.cpu_count()) as executor:
+#         results = list(executor.map(run_algorithm, args))
 
-    return results
+#     return results
 
-def run_exp_parallel(algo, parameters, n_runs, problem_name, problem_info, noise_type, noise_value, suffix=''):
-    name = get_exp_name(algo, parameters, suffix)
-    data = conduct_runs_parallel(n_runs, algo, parameters, problem_name, noise_type, noise_value)
-    save_data(data, problem_name, name)
-    save_parameters(parameters, problem_name, name)
-    save_problem(problem_info, problem_name)
+# def run_exp_parallel(algo, parameters, n_runs, problem_name, problem_info, noise_type, noise_value, suffix=''):
+#     name = get_exp_name(algo, parameters, suffix)
+#     data = conduct_runs_parallel(n_runs, algo, parameters, problem_name, noise_type, noise_value)
+#     save_data(data, problem_name, name)
+#     save_parameters(parameters, problem_name, name)
+#     save_problem(problem_info, problem_name)
 
 
 def binary_attribute():
@@ -978,7 +897,7 @@ def get_base_MuPlusOneEA(attr_function, mutate_function, fitness_function, true_
     params = {
         'len_sol': n_items, # solution length
         'weights': fit_weights,
-        'mu': 100, # Population
+        'mu': 10, # Population
         'gens': 1000000, # generation limit
         'evals': 50000, # fitness eval limit
         'target': None, # stopping fitness
@@ -1074,7 +993,7 @@ problem_names = [
 if __name__ == "__main__":
 
     n_runs_HC = 100
-    n_runs = 100
+    n_runs = 30
 
 
     # OneMax Problems
@@ -1118,18 +1037,18 @@ if __name__ == "__main__":
         PCEA_params = get_base_PCEA(binary_attribute, fitness_function, true_fitness_function, fit_weights, n_items)
         PCEA_params['popsize'] = PCEA_popsize
         PCEA_params['evals'] = evalLimit
-        run_exp(PCEA, PCEA_params, n_runs, problem_name, problem_info, noise_type, noisevalue, suffix='')
+        # run_exp(PCEA, PCEA_params, n_runs, problem_name, problem_info, noise_type, noisevalue, suffix='')
 
         # Run UMDA
         UMDA_params = get_base_UMDA(binary_attribute, fitness_function, true_fitness_function, fit_weights, n_items)
         UMDA_params['popsize'] = UMDA_popsize
         UMDA_params['evals'] = evalLimit
-        run_exp(UMDA, UMDA_params, n_runs, problem_name, problem_info, noise_type, noisevalue, suffix='')
+        # run_exp(UMDA, UMDA_params, n_runs, problem_name, problem_info, noise_type, noisevalue, suffix='')
         
         # Run 1+1 EA
         OnePlusOneParams = get_base_OnePlusOneEA(binary_attribute, mutate_function, fitness_function, true_fitness_function, fit_weights, n_items)
         OnePlusOneParams['evals'] = evalLimit
-        run_exp(OnePlusOneEA, OnePlusOneParams, n_runs, problem_name, problem_info, noise_type, noisevalue, suffix='')
+        # run_exp(OnePlusOneEA, OnePlusOneParams, n_runs, problem_name, problem_info, noise_type, noisevalue, suffix='')
 
         # Run Mutation population
         EA_params = get_base_EA(binary_attribute, mutate_function, fitness_function, true_fitness_function, fit_weights, n_items)
@@ -1147,7 +1066,7 @@ if __name__ == "__main__":
         # Mu + 1 EA
         MuPlusOneParams = get_base_MuPlusOneEA(binary_attribute, mutate_function, fitness_function, true_fitness_function, fit_weights, n_items)
         MuPlusOneParams['evals'] = evalLimit
-        MuPlusOneParams['mu'] = mutEA_popsize
+        # MuPlusOneParams['mu'] = mutEA_popsize
         run_exp(MuPlusOneEA, MuPlusOneParams, n_runs, problem_name, problem_info, noise_type, noisevalue, suffix='')
 
         progress_bar.update(1)
@@ -1238,4 +1157,10 @@ if __name__ == "__main__":
 
 
 
-performance_df.to_csv('data.csv', index=False)
+# performance_df.to_csv('data.csv', index=False)
+csv_file_exists = os.path.exists('data.csv')
+
+performance_df.to_csv('data.csv',
+                      mode='a',               # Append mode
+                      header=not csv_file_exists, # Include header only if file doesn't exist
+                      index=False)
