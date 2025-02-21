@@ -8,7 +8,6 @@ from deap import creator
 from deap import tools
 
 from ProblemScripts import load_problem_KP
-from FitnessFunctions import *
 
 import os
 import pickle
@@ -79,6 +78,73 @@ def complementary_crossover(parent1, parent2):
 
     return offspring1, offspring2
 
+def OneMax_fitness(individual, noise_function=None, noise_intensity=0):
+    """ Function calculates fitness for OneMax problem individual """
+    if noise_function is not None: # Provide noise function for noise applied to individual
+        individual = noise_function(individual[:], noise_intensity)
+        fitness = sum(individual)
+    else: # standard noisy
+        fitness = sum(individual) + random.gauss(0, noise_intensity)
+    return (fitness,)
+
+def eval_ind_kp(individual, items_dict, capacity, penalty=1):
+    """ Function calculates fitness for knapsack problem individual """
+    n_items = len(individual)
+    weight = sum(items_dict[i][1] * individual[i] for i in range(n_items)) # Calc solution weight
+    value = sum(items_dict[i][0] * individual[i] for i in range(n_items)) # Calc solution value
+    
+    # Check if over capacity and return reduced value
+    if weight > capacity:
+        if penalty == 1:
+            value_with_penalty = capacity - weight
+            return (value_with_penalty,)
+        else:
+            return (0,)
+    return (value,) # Not over capacity return value
+
+def eval_noisy_kp_v1(individual, items_dict, capacity, noise_intensity=0, penalty=1):
+    """ Function calculates fitness for knapsack problem individual """
+    n_items = len(individual)
+    weight = sum(items_dict[i][1] * individual[i] for i in range(n_items)) # Calc solution weight
+    value = sum(items_dict[i][0] * individual[i] for i in range(n_items)) # Calc solution value
+    
+    noise = random.gauss(0, noise_intensity)
+    weight = weight + noise
+
+    # Check if over capacity and return reduced value
+    if weight > capacity:
+        if penalty == 1:
+            value_with_penalty = capacity - weight
+            return (value_with_penalty,)
+        else:
+            return (0,)
+    return (value,) # Not over capacity return value
+
+def eval_noisy_kp_v2(individual, items_dict, capacity, noise_intensity=0, penalty=1):
+    """ Function calculates fitness for knapsack problem individual """
+    n_items = len(individual)
+    weight = sum(items_dict[i][1] * individual[i] for i in range(n_items)) # Calc solution weight
+    value = sum(items_dict[i][0] * individual[i] for i in range(n_items)) # Calc solution value
+    
+    noise = random.gauss(0, noise_intensity)
+    value = value + noise
+
+    # Check if over capacity and return reduced value
+    if (weight + noise) > capacity:
+        if penalty == 1:
+            value_with_penalty = capacity - weight
+            return (value_with_penalty,)
+        else:
+            return (0,)
+    return (value,) # Not over capacity return value
+
+def rastrigin_eval(individual, amplitude=5):
+    # print(f"Evaluating individual: {individual}")
+    # print(f"Types in individual: {[type(x) for x in individual]}")
+    A = amplitude
+    n = len(individual)
+    fitness = A * n + sum((x ** 2 - A * np.cos(2 * np.pi * x)) for x in individual),
+    return fitness
 
 # Population recording
 def record_population_state(data, population, toolbox, true_fitness_function):
@@ -549,10 +615,8 @@ def EA(len_sol, weights, popsize, gens=None, evals=None, target=None, attr_funct
 def umda_update_full(len_sol, population, pop_size, select_size, toolbox):
     # Select from population
     selected_population = tools.selBest(population, select_size)
-    
     # Determine the data type of the genes from the first individual in the population
     gene_type = type(population[0][0])
-    
     # Calculate marginal probabilities for binary solutions (assumes binary values are either 0 or 1)
     if gene_type == int:
         probabilities = np.mean(selected_population, axis=0)
@@ -568,16 +632,14 @@ def umda_update_full(len_sol, population, pop_size, select_size, toolbox):
         selected_array = np.array(selected_population)
         means = np.mean(selected_array, axis=0)
         stds = np.std(selected_array, axis=0)
-
+        
         new_solutions = []
         for _ in range(pop_size):
             new_solution = np.random.normal(means, stds, len_sol)
             new_solution = creator.Individual(new_solution.tolist())  # Create as DEAP Individual
             new_solutions.append(new_solution)
-
     else:
         raise ValueError("Unsupported gene type. Expected int or float.")
-    
     return new_solutions
 
 def UMDA(len_sol, weights, popsize, selectsize, gens=None, evals=None, target=None, attr_function=None, fitness_function=None, starting_solution=None, true_fitness_function=None):
@@ -815,31 +877,46 @@ def run_exp(algo, parameters, n_runs, problem_name, problem_info, noise_type, no
     save_parameters(parameters, problem_name, name)
     save_problem(problem_info, problem_name)
 
-# MULTITHREADED CODE
 
-# def run_algorithm(args):
-#     """Wrapper function to run a single algorithm instance."""
-#     algorithm_function, param_dict = args
-#     all_generations, best_solutions, best_fitnesses, true_fitnesses = algorithm_function(**param_dict)
-#     unique_solutions, unique_fitnesses, solution_iterations = extract_trajectory_data(best_solutions, true_fitnesses)
-#     transitions = extract_transitions(unique_solutions)
+# problem_name = 'rastriginN2A10'
+
+
+# attr_function = (random.uniform, -5.12, 5.12) # attribute function for rastrigin
+# attr_function = (random.randint, 0, 1) # binary attribute function
+
+# mutate_function = (tools.mutGaussian, {'mu': 0, 'sigma': 0.1, 'indpb': 0.05})
+# mutate_function = (tools.mutGaussian, {'mu': 0, 'sigma': 0.1, 'indpb': 0.5})
+# mutate_function = (tools.mutFlipBit, {'indpb': 0.01})
+
+# fitness_function = (OneMax_fitness, {'noise_function': random_bit_flip, 'noise_intensity': 50})
+# fitness_function = (rastrigin_eval, {'amplitude':10})
+# fitness_function_true = (OneMax_fitness, {})
+# fitness_function = (eval_ind_kp, {'items_dict': items_dict, 'capacity': capacity, 'penalty': 1})
+
+
+def run_algorithm(args):
+    """Wrapper function to run a single algorithm instance."""
+    algorithm_function, param_dict = args
+    all_generations, best_solutions, best_fitnesses, true_fitnesses = algorithm_function(**param_dict)
+    unique_solutions, unique_fitnesses, solution_iterations = extract_trajectory_data(best_solutions, true_fitnesses)
+    transitions = extract_transitions(unique_solutions)
     
-#     return unique_solutions, unique_fitnesses, solution_iterations, transitions
+    return unique_solutions, unique_fitnesses, solution_iterations, transitions
 
-# def conduct_runs_parallel(num_runs, algorithm_function, param_dict):
-#     """Conducts multiple algorithm runs in parallel."""
-#     args = [(algorithm_function, param_dict) for _ in range(num_runs)]
-#     with ProcessPoolExecutor(max_workers=multiprocessing.cpu_count()) as executor:
-#         results = list(executor.map(run_algorithm, args))
+def conduct_runs_parallel(num_runs, algorithm_function, param_dict):
+    """Conducts multiple algorithm runs in parallel."""
+    args = [(algorithm_function, param_dict) for _ in range(num_runs)]
+    with ProcessPoolExecutor(max_workers=multiprocessing.cpu_count()) as executor:
+        results = list(executor.map(run_algorithm, args))
 
-#     return results
+    return results
 
-# def run_exp_parallel(algo, parameters, n_runs, problem_name, problem_info, noise_type, noise_value, suffix=''):
-#     name = get_exp_name(algo, parameters, suffix)
-#     data = conduct_runs_parallel(n_runs, algo, parameters, problem_name, noise_type, noise_value)
-#     save_data(data, problem_name, name)
-#     save_parameters(parameters, problem_name, name)
-#     save_problem(problem_info, problem_name)
+def run_exp_parallel(algo, parameters, n_runs, problem_name, problem_info, noise_type, noise_value, suffix=''):
+    name = get_exp_name(algo, parameters, suffix)
+    data = conduct_runs_parallel(n_runs, algo, parameters, problem_name, noise_type, noise_value)
+    save_data(data, problem_name, name)
+    save_parameters(parameters, problem_name, name)
+    save_problem(problem_info, problem_name)
 
 
 def binary_attribute():
