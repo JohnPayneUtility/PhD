@@ -268,7 +268,7 @@ class MuPlusLamdaEA(OptimisationAlgorithm):
 
 class PCEA(OptimisationAlgorithm):
     def __init__(self, 
-                 pop_size: int, 
+                 pop_size: int,
                  **kwargs): # other parameters passed to the base class
         
         # Initialize common components via the base class
@@ -316,6 +316,7 @@ class PCEA(OptimisationAlgorithm):
 class UMDA(OptimisationAlgorithm):
     def __init__(self, 
                  pop_size: int,
+                 select_size: Optional[int] = None,
                  **kwargs): # other parameters passed to the base class
         
         # Initialize common components via the base class
@@ -323,6 +324,9 @@ class UMDA(OptimisationAlgorithm):
         self.gens = 0
         self.evals = 0
         self.pop_size = pop_size
+        if select_size == None:
+            self.select_size = int(self.pop_size/2)
+        else: self.select_size = select_size
         self.name = f'UMDA'
 
         # Create the initial population of size mu
@@ -331,11 +335,10 @@ class UMDA(OptimisationAlgorithm):
 
     def perform_generation(self):
         """Perform generation of UMDA Evolutionary Algorithm"""
-        selectsize = self.pop_size/2
-        population = umda_update_full(self.sol_length, population, self.pop_size, selectsize, self.toolbox)
+        self.population = umda_update_full(self.sol_length, self.population, self.pop_size, self.select_size, self.toolbox)
 
-        fitnesses = list(map(self.toolbox.evaluate, population))
-        for ind, fit in zip(population, fitnesses):
+        fitnesses = list(map(self.toolbox.evaluate, self.population))
+        for ind, fit in zip(self.population, fitnesses):
             ind.fitness.values = fit
         self.evals += self.pop_size
 
@@ -450,7 +453,7 @@ if __name__ == "__main__":
     }
 
     # algo = MuPlusLamdaEA(mu=5, lam=1, mutate_function=mutate_function, **base_params)
-    algo = UMDA(pop_size=20, **base_params)
+    algo = UMDA(pop_size=100, **base_params)
 
     algo.run()
     all_gens, best_sols, best_fits, true_fits = algo.get_classic_data()
@@ -458,8 +461,8 @@ if __name__ == "__main__":
     # (Optional) Print the final best fitness
     print("Algo name:", algo.name)
     print("Final best fitness:", true_fits[-1])
-    # print("First best sol:", best_sols[1])
-    # print("Final best sol:", best_sols[-1])
+    # # print("First best sol:", best_sols[1])
+    # # print("Final best sol:", best_sols[-1])
 
 # ==============================
 # Parameter Optimisation Example
@@ -497,7 +500,7 @@ def objective(trial):
     # algo = MuPlusLamdaEA(mu=mu, lam=lam, mutate_function=mutate_function, **base_params)
     # cGAps = trial.suggest_int("cGAps", 1, 50)
     # algo = CompactGA(cga_pop_size=cGAps, **base_params)
-    pop_size = trial.suggest_int("pop", 4, 40)
+    pop_size = trial.suggest_int("pop", 4, 100)
     algo = PCEA(pop_size, **base_params)
     
     # Run the algorithm.
