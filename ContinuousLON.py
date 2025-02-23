@@ -3,45 +3,7 @@ from scipy.optimize import basinhopping, minimize
 import os
 import pickle
 from LON_Utilities import convert_to_split_edges_format
-
-def rastrigin_eval(individual, amplitude=10):
-    """
-
-    """
-    A = amplitude
-    n = len(individual)
-    fitness = A * n + sum((x ** 2 - A * np.cos(2 * np.pi * x)) for x in individual),
-    return fitness
-
-def birastrigin_eval(individual, d=1, s=None):
-    """
-    Fitness evaluation for the Birastrigin problem
-
-    Args:
-        individual (list or np.ndarray): The input vector representing an individual.
-        d (float, optional): Parameter `d`, standardized to 1 unless specified otherwise.
-        s (float, optional): Parameter `s`, if not provided, it is calculated as per the formula.
-
-    Returns:
-        tuple: A single-element tuple containing the fitness value.
-    """
-    # Define parameters
-    mu1 = 2.5
-    if s is None:
-        s = 1 - (1 / (2 * np.sqrt(2) + 20 - 8.2))
-    mu2 = -np.sqrt(mu1**2 - d / s)
-
-    n = len(individual)
-
-    # Compute the two components of the fitness function
-    term1 = sum((x - mu1)**2 for x in individual)
-    term2 = d * n + s * sum((x - mu2)**2 for x in individual)
-    term3 = 10 * sum(1 - np.cos(2 * np.pi * (x - mu1)) for x in individual)
-
-    # Final fitness calculation
-    fitness = min(term1, term2) + term3
-
-    return fitness
+from FitnessFunctions import *
 
 class BasinHoppingCallback:
     def __init__(self, precision=1e-5, max_no_improve=1000):

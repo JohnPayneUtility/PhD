@@ -151,7 +151,7 @@ def extract_transitions(unique_solutions):
 class OptimisationAlgorithm:
     sol_length: int
     opt_weights: Tuple[float, ...]
-    gen_limit: Optional[int] = 10e6
+    gen_limit: Optional[int] = int(10e6)
     eval_limit: Optional[int] = None
     target_stop: Optional[float] = None
     attr_function: Optional[Callable] = None
@@ -166,6 +166,7 @@ class OptimisationAlgorithm:
     true_fitnesses: List[float] = field(default_factory=list)
 
     def __post_init__(self):
+        self.seed_signature = random.randint(0, 10**6)
         self.data = [self.all_generations, self.best_solutions, self.best_fitnesses, self.true_fitnesses]
 
         # Fitness and individual creators
@@ -180,14 +181,6 @@ class OptimisationAlgorithm:
         self.toolbox.register("individual", tools.initRepeat, creator.Individual, self.toolbox.attribute, n=self.sol_length)
         self.toolbox.register("population", tools.initRepeat, list, self.toolbox.individual)
         self.toolbox.register("evaluate", lambda ind: self.fitness_function[0](ind, **self.fitness_function[1]))
-
-    @abstractmethod
-    def run(self):
-        """
-        Run the evolutionary algorithm.
-        Subclasses must implement this method.
-        """
-        pass
 
     def initialise_population(self, pop_size):
         self.population = self.toolbox.population(n=pop_size)
@@ -228,6 +221,14 @@ class OptimisationAlgorithm:
 
     def get_classic_data(self):
         return self.all_generations, self.best_solutions, self.best_fitnesses, self.true_fitnesses
+    
+    def get_solution_data(self):
+        return self.best_solutions, self.best_fitnesses, self.true_fitnesses
+    
+    def get_trajectory_data(self):
+        unique_sols, unique_fits, sol_iterations = extract_trajectory_data(self.best_solutions, self.best_fitnesses)
+        sol_transitions = extract_transitions(unique_sols)
+        return unique_sols, unique_fits, sol_iterations, sol_transitions
 
 # ==============================
 # Evolutionary Algorithm Subclasses
