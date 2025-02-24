@@ -8,7 +8,7 @@ from deap import tools
 
 from Algorithms import *
 from FitnessFunctions import *
-from Experiments import *
+from RunManager import *
 
 # ----------------------------------------------------------------
 # A simple test to check that different seeds produce different outcomes
