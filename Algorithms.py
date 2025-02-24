@@ -226,7 +226,7 @@ class OptimisationAlgorithm:
         return self.best_solutions, self.best_fitnesses, self.true_fitnesses
     
     def get_trajectory_data(self):
-        unique_sols, unique_fits, sol_iterations = extract_trajectory_data(self.best_solutions, self.best_fitnesses)
+        unique_sols, unique_fits, sol_iterations = extract_trajectory_data(self.best_solutions, self.true_fitnesses)
         sol_transitions = extract_transitions(unique_sols)
         return unique_sols, unique_fits, sol_iterations, sol_transitions
 
@@ -238,7 +238,8 @@ class MuPlusLamdaEA(OptimisationAlgorithm):
     def __init__(self, 
                  mu: int,
                  lam: int, 
-                 mutate_function: Tuple[Callable, dict], 
+                 mutate_function: Callable, 
+                 mutate_params: dict,
                  **kwargs): # other parameters passed to the base class
         
         # Initialize common components via the base class
@@ -250,7 +251,7 @@ class MuPlusLamdaEA(OptimisationAlgorithm):
         self.name = f'({mu}+{lam})EA'
 
         # Register the mutation operator in the toolbox
-        self.toolbox.register("mutate", lambda ind: mutate_function[0](ind, **mutate_function[1]))
+        self.toolbox.register("mutate", lambda ind: mutate_function(ind, **mutate_params))
 
         # Create the initial population of size mu
         self.initialise_population(self.mu)
@@ -283,7 +284,7 @@ class PCEA(OptimisationAlgorithm):
         self.gens = 0
         self.evals = 0
         self.pop_size = pop_size
-        self.name = f'PCEA'
+        self.name = f'PCEA(p={pop_size})'
 
         # Register the mutation operator in the toolbox
         self.toolbox.register("mate", complementary_crossover)
@@ -334,7 +335,7 @@ class UMDA(OptimisationAlgorithm):
         if select_size == None:
             self.select_size = int(self.pop_size/2)
         else: self.select_size = select_size
-        self.name = f'UMDA'
+        self.name = f'UMDA(p={pop_size})'
 
         # Create the initial population of size mu
         self.initialise_population(self.pop_size)
@@ -351,7 +352,7 @@ class UMDA(OptimisationAlgorithm):
 
 class CompactGA(OptimisationAlgorithm):
     def __init__(self, 
-                 cga_pop_size: int,
+                 pop_size: int,
                  **kwargs):
         """
         Compact Genetic Algorithm.
@@ -364,8 +365,8 @@ class CompactGA(OptimisationAlgorithm):
         super().__init__(**kwargs)
         self.gens = 0
         self.evals = 0
-        self.name = "cGA"
-        self.cga_pop_size = cga_pop_size
+        self.cga_pop_size = pop_size
+        self.name = f"cGA(p={pop_size})"
         # Initialize the probability vector (one value per gene)
         self.p_vector = [0.5] * self.sol_length
         # Record the initial state by sampling a candidate solution.
@@ -422,14 +423,14 @@ class CompactGA(OptimisationAlgorithm):
         # We pass a list with the candidate to record_state (to mimic a population).
         self.population = [candidate]
     
-    def stop_condition(self) -> bool:
-        """
-        Stop if the probability vector has converged (all entries are 0 or 1)
-        or if any base class stopping conditions are met.
-        """
-        if all(p in (0.0, 1.0) for p in self.p_vector):
-            return True
-        return super().stop_condition()
+    # def stop_condition(self) -> bool:
+    #     """
+    #     Stop if the probability vector has converged (all entries are 0 or 1)
+    #     or if any base class stopping conditions are met.
+    #     """
+    #     if all(p in (0.0, 1.0) for p in self.p_vector):
+    #         return True
+    #     return super().stop_condition()
 
 # ==============================
 # Example Usage
@@ -462,14 +463,14 @@ if __name__ == "__main__":
     # algo = MuPlusLamdaEA(mu=5, lam=1, mutate_function=mutate_function, **base_params)
     algo = UMDA(pop_size=100, **base_params)
 
-    algo.run()
-    all_gens, best_sols, best_fits, true_fits = algo.get_classic_data()
+    # algo.run()
+    # all_gens, best_sols, best_fits, true_fits = algo.get_classic_data()
     
-    # (Optional) Print the final best fitness
-    print("Algo name:", algo.name)
-    print("Final best fitness:", true_fits[-1])
-    # # print("First best sol:", best_sols[1])
-    # # print("Final best sol:", best_sols[-1])
+    # # (Optional) Print the final best fitness
+    # print("Algo name:", algo.name)
+    # print("Final best fitness:", true_fits[-1])
+    # # # print("First best sol:", best_sols[1])
+    # # # print("Final best sol:", best_sols[-1])
 
 # ==============================
 # Parameter Optimisation Example
@@ -500,7 +501,7 @@ def objective(trial):
         'true_fitness_function': true_fitness_function,
         'starting_solution': None,
         'target_stop': None,             # No early stopping target
-        'gen_limit': 100                 # Limit generations for tuning speed
+        'gen_limit': 10000                 # Limit generations for tuning speed
     }
     
     # Create an instance of your MuPlusLamdaEA algorithm with the candidate μ.
@@ -508,7 +509,7 @@ def objective(trial):
     # cGAps = trial.suggest_int("cGAps", 1, 50)
     # algo = CompactGA(cga_pop_size=cGAps, **base_params)
     pop_size = trial.suggest_int("pop", 4, 100)
-    algo = PCEA(pop_size, **base_params)
+    algo = CompactGA(pop_size, **base_params)
     
     # Run the algorithm.
     algo.run()
@@ -518,12 +519,25 @@ def objective(trial):
     final_fitness = true_fits[-1]
     
     # Return the final best fitness; Optuna will try to maximize this value.
-    return final_fitness
+    return (final_fitness, algo.evals)
 
+# SINGLE OBJECTIVE
 # study = optuna.create_study(direction="maximize")
-# study.optimize(objective, n_trials=100)
-
+# study.optimize(objective, n_trials=1000)
 # print("Best parameters: ", study.best_params)
 # print("Best objective: ", study.best_value)
 
+# MULTI OBJECTIVE
+study = optuna.create_study(directions=["maximize", "minimize"])
+study.optimize(objective, n_trials=1000)
+best_trials = study.best_trials
+for trial in best_trials:
+    print("Trial params:", trial.params)
+    print("Trial values:", trial.values)
 
+# Range 4-100
+# 1000 trials
+
+# cGA 
+# UMDA 35
+# PCEA
