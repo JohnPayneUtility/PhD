@@ -377,7 +377,7 @@ class CompactGA(OptimisationAlgorithm):
         Generate a candidate solution by rounding the probability vector.
         For example, if p >= 0.5, choose 1; otherwise, choose 0.
         """
-        candidate_list = [1 if p >= 0.5 else 0 for p in self.p_vector]
+        candidate_list = [1 if random.random() < p else 0 for p in self.p_vector]
         candidate = creator.Individual(candidate_list)
         candidate.fitness.values = self.toolbox.evaluate(candidate)
         return candidate
@@ -478,15 +478,16 @@ if __name__ == "__main__":
 
 def objective(trial):
     # Suggest a candidate value for μ (mu). For example, between 5 and 50.
-    # mu = trial.suggest_int("mu", 5, 50)
+    # mu = trial.suggest_int("mu", 5, 100)
     # # lam = trial.suggest_int("lam", 1, 10)
     lam = 1
     # k = trial.suggest_int("k", 1, 10)
 
     # Mutation operator: using DEAP's mutFlipBit with a high mutation probability for demonstration.
     mutation_rate = 1 / 100  # For a 100-bit solution.
-    mutate_function = (tools.mutFlipBit, {'indpb': mutation_rate})
-    
+    mutate_function = tools.mutFlipBit
+    mutate_params = {'indpb': mutation_rate}
+
     # Define fitness functions (using the dummy OneMax_fitness here).
     fitness_function = (OneMax_fitness, {'noise_intensity': 0})
     true_fitness_function = (OneMax_fitness, {'noise_intensity': 0})
@@ -500,16 +501,14 @@ def objective(trial):
         'fitness_function': fitness_function,
         'true_fitness_function': true_fitness_function,
         'starting_solution': None,
-        'target_stop': None,             # No early stopping target
+        'target_stop': 100,             # No early stopping target
         'gen_limit': 10000                 # Limit generations for tuning speed
     }
     
     # Create an instance of your MuPlusLamdaEA algorithm with the candidate μ.
-    # algo = MuPlusLamdaEA(mu=mu, lam=lam, mutate_function=mutate_function, **base_params)
-    # cGAps = trial.suggest_int("cGAps", 1, 50)
-    # algo = CompactGA(cga_pop_size=cGAps, **base_params)
+    # algo = MuPlusLamdaEA(mu=mu, lam=lam, mutate_function=mutate_function, mutate_params=mutate_params, **base_params)
     pop_size = trial.suggest_int("pop", 4, 100)
-    algo = CompactGA(pop_size, **base_params)
+    algo = PCEA(pop_size, **base_params)
     
     # Run the algorithm.
     algo.run()
@@ -528,16 +527,17 @@ def objective(trial):
 # print("Best objective: ", study.best_value)
 
 # MULTI OBJECTIVE
-study = optuna.create_study(directions=["maximize", "minimize"])
-study.optimize(objective, n_trials=1000)
-best_trials = study.best_trials
-for trial in best_trials:
-    print("Trial params:", trial.params)
-    print("Trial values:", trial.values)
+# study = optuna.create_study(directions=["maximize", "minimize"])
+# study.optimize(objective, n_trials=1000)
+# best_trials = study.best_trials
+# for trial in best_trials:
+#     print("Trial params:", trial.params)
+#     print("Trial values:", trial.values)
 
 # Range 4-100
 # 1000 trials
 
-# cGA 
+# mu + 1 EA 5
+# cGA 22
 # UMDA 35
-# PCEA
+# PCEA 22
