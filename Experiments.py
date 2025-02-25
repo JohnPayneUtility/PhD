@@ -81,6 +81,37 @@ def FiveAlgosTuned(prob_info, base_params, fitness_functions, noise_values, runs
     save_or_append_results(results_df)
     print(f"Completed problem {prob_info['name']}")
 
+def FiveAlgos(prob_info, base_params, fitness_functions, noise_values, runs):
+    algorithm_classes = [MuPlusLamdaEA, PCEA, UMDA, CompactGA]
+    extra_params_by_algo = {
+        'MuPlusLamdaEA': [
+            {'mu': 1, 'lam': 1, 'mutate_function': tools.mutFlipBit, 'mutate_params': {'indpb': 1/100}},
+            {'mu': 100, 'lam': 1, 'mutate_function': tools.mutFlipBit, 'mutate_params': {'indpb': 1/100}},
+        ],
+        'PCEA': [
+            {'pop_size': 100},
+        ],
+        'UMDA': [
+            {'pop_size': 100},
+        ],
+        'CompactGA': [
+            {'pop_size': 100},
+        ]
+    }
+    results_df = run_experiment(prob_info,
+                                algorithm_classes,
+                                fitness_functions,
+                                noise_values,
+                                extra_params_by_algo,
+                                base_params,
+                                num_runs=runs,
+                                base_seed=0,
+                                parallel=True)
+    pd.set_option('display.max_columns', None)
+    # print(results_df.head(20))
+    save_or_append_results(results_df)
+    print(f"Completed problem {prob_info['name']}")
+
 # ----------------------------------------------------------------
 # Experiment Settings
 # ----------------------------------------------------------------
@@ -135,6 +166,7 @@ kp_problems = [
 ]
 
 if __name__ == '__main__':
+    # ---------- ONEMAX ----------
     if 'onemax' in selected_problems:
         prob_info = {
             'name': 'OneMax100Item',
@@ -153,6 +185,7 @@ if __name__ == '__main__':
         fitness_functions = [(OneMax_fitness, {})]
         basis_experiment(prob_info, base_params, fitness_functions, noise_values, runs)
     
+    # ---------- KNAPSACK ----------
     if 'knapsack' in selected_problems:
         for (filename, opt) in kp_problems:
             n_items, capacity, optimal, values, weights, items_dict, problem_info = load_problem_KP(filename)
