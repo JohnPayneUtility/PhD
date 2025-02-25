@@ -334,14 +334,11 @@ for problem_name in problem_names:
         "edges": {},
         }
     
-    n_flips_mut = 3
-    n_flips_pert = 6
+    n_flips_mut = 1
+    n_flips_pert = 2
     
     for i in trange(500):
         local_optima, fitness_values, edges_list = BinaryLON(1000, n_items, fit_weights, attr_function=binary_attribute, n_flips_mut=n_flips_mut, n_flips_pert=n_flips_pert, mutate_function=None, perturb_function=None, improv_method='best', fitness_function=fitness_function, starting_solution=None, true_fitness_function=None)
-        # print(local_optima)
-        # print(fitness_values)
-        # print(edges_list)
 
         # Aggregate optima
         for opt, fitness in zip(local_optima, fitness_values):

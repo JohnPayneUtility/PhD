@@ -53,6 +53,7 @@ def algo_data_single(prob_info: Dict[str, Any],
         "algo_name": algo_instance.name,
         "n_gens": algo_instance.gens,
         "n_evals": algo_instance.evals,
+        "stop_trigger": algo_instance.stop_trigger,
         "n_unique_sols": len(unique_sols),
         "unique_sols": unique_sols,
         "unique_fits": unique_fits,
@@ -148,9 +149,16 @@ def run_experiment(prob_info: Dict[str, Any],
             params = base_params.copy()
             params.update(extra_params)
             # Update the fitness function tuple with the noise value.
-            params['fitness_function'] = (fitness_fn[0], {'noise_intensity': noise})
-            # For the true fitness function, assume noise is 0.
-            params['true_fitness_function'] = (fitness_fn[0], {'noise_intensity': 0})
+            # params['fitness_function'] = (fitness_fn[0], {'noise_intensity': noise})
+            # # For the true fitness function, assume noise is 0.
+            # params['true_fitness_function'] = (fitness_fn[0], {'noise_intensity': 0})
+            fit_params = fitness_fn[1].copy()  # copy the original parameters
+            fit_params.update({'noise_intensity': noise})
+            params['fitness_function'] = (fitness_fn[0], fit_params)
+
+            true_fit_params = fitness_fn[1].copy()
+            true_fit_params.update({'noise_intensity': 0})
+            params['true_fitness_function'] = (fitness_fn[0], true_fit_params)
             
             # Run the experiments for this configuration.
             df = algo_data_multi(prob_info, algo_class, params, num_runs, base_seed, parallel)
@@ -166,55 +174,3 @@ def run_experiment(prob_info: Dict[str, Any],
     
     final_df = pd.concat(results_list, ignore_index=True)
     return final_df
-
-# ----------------------------------------------------------------
-# Example Usage
-# ----------------------------------------------------------------
-
-if __name__ == '__main__':
-    prob_info = {
-        'name': 'OneMax100Item',
-        'maximise': True,
-        'opt_global': 100 
-    }
-    base_params = {
-        'sol_length': 100,                         # Length of the solution.
-        'opt_weights': (1.0,),                     # Maximization problem.
-        'eval_limit': 100000,                        # Maximum fitness evaluations.
-        'attr_function': binary_attribute,
-        'starting_solution': None,
-        'target_stop': 100,
-        'gen_limit': None
-    }
-    fitness_functions = [(OneMax_fitness, {})]
-    noise_values = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-    algorithm_classes = [MuPlusLamdaEA, PCEA, UMDA, CompactGA]
-    # algorithm_classes = [CompactGA]
-    extra_params_by_algo = {
-        'MuPlusLamdaEA': [
-            {'mu': 1, 'lam': 1, 'mutate_function': tools.mutFlipBit, 'mutate_params': {'indpb': 1/100}},
-            {'mu': 5, 'lam': 1, 'mutate_function': tools.mutFlipBit, 'mutate_params': {'indpb': 1/100}},
-        ],
-        'PCEA': [
-            {'pop_size': 22},
-        ],
-        'UMDA': [
-            {'pop_size': 35},
-        ],
-        'CompactGA': [
-            {'pop_size': 22},
-        ]
-    }
-    results_df = run_experiment(prob_info,
-                                algorithm_classes,
-                                fitness_functions,
-                                noise_values,
-                                extra_params_by_algo,
-                                base_params,
-                                num_runs=100,
-                                base_seed=0,
-                                parallel=True)
-    pd.set_option('display.max_columns', None)
-    print(results_df.head(20))
-    results_df.to_pickle('results.pkl')
-
