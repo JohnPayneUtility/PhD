@@ -4,9 +4,9 @@ import os
 from ProblemScripts import load_problem_KP
 
 
-# ----------------------------------------------------------------
+# ==============================
 # Helper Functions
-# ----------------------------------------------------------------
+# ==============================
 
 def save_or_append_results(df: pd.DataFrame, filename: str = 'results.pkl') -> None:
     """
@@ -22,9 +22,9 @@ def save_or_append_results(df: pd.DataFrame, filename: str = 'results.pkl') -> N
         # If the file doesn't exist, simply save the new DataFrame
         df.to_pickle(filename)
 
-# ----------------------------------------------------------------
+# ==============================
 # Basis Experiment Runs
-# ----------------------------------------------------------------
+# ==============================
 
 def TwoAlgosTuned(prob_info, base_params, fitness_functions, noise_values, runs):
     algorithm_classes = [MuPlusLamdaEA, UMDA]
@@ -81,8 +81,8 @@ def FiveAlgosTuned(prob_info, base_params, fitness_functions, noise_values, runs
     save_or_append_results(results_df)
     print(f"Completed problem {prob_info['name']}")
 
-def FiveAlgos(prob_info, base_params, fitness_functions, noise_values, runs):
-    algorithm_classes = [MuPlusLamdaEA, PCEA, UMDA, CompactGA]
+def FourAlgos(prob_info, base_params, fitness_functions, noise_values, runs):
+    algorithm_classes = [MuPlusLamdaEA, PCEA, UMDA]
     extra_params_by_algo = {
         'MuPlusLamdaEA': [
             {'mu': 1, 'lam': 1, 'mutate_function': tools.mutFlipBit, 'mutate_params': {'indpb': 1/100}},
@@ -94,9 +94,6 @@ def FiveAlgos(prob_info, base_params, fitness_functions, noise_values, runs):
         'UMDA': [
             {'pop_size': 100},
         ],
-        'CompactGA': [
-            {'pop_size': 100},
-        ]
     }
     results_df = run_experiment(prob_info,
                                 algorithm_classes,
@@ -112,25 +109,26 @@ def FiveAlgos(prob_info, base_params, fitness_functions, noise_values, runs):
     save_or_append_results(results_df)
     print(f"Completed problem {prob_info['name']}")
 
-# ----------------------------------------------------------------
+# ==============================
 # Experiment Settings
-# ----------------------------------------------------------------
-basis_experiment = FiveAlgosTuned
+# ==============================
+basis_experiment = FourAlgos
 eval_limit = 10000
 runs = 30
 selected_problems = [
-        # 'onemax',
+        'onemax',
         'knapsack',
-        # 'rastrigin',
+        'rastrigin',
     ]
 noise_values = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 noise_values = [0, 3, 6, 9]
 
 
 
-# ----------------------------------------------------------------
+# ==============================
 # Problem Specific Settings and Sub Experiment
-# ----------------------------------------------------------------
+# ==============================
+rastrigin_dims = [2, 3]
 kp_problems = [
     ('f10_l-d_kp_20_879', 1025),
     ('f1_l-d_kp_10_269', 295),
@@ -141,7 +139,7 @@ kp_problems = [
     # ('f6_l-d_kp_10_60', 52),
     # ('f7_l-d_kp_7_50', 107),
     # ('f8_l-d_kp_23_10000', 9767),
-    ('f9_l-d_kp_5_80', 130),
+    # ('f9_l-d_kp_5_80', 130),
     # ('knapPI_1_10000_1000_1', 563647),
     # ('knapPI_1_1000_1000_1', 54503),
     # ('knapPI_1_100_1000_1', 9147),
@@ -169,9 +167,12 @@ if __name__ == '__main__':
     # ---------- ONEMAX ----------
     if 'onemax' in selected_problems:
         prob_info = {
-            'name': 'OneMax100Item',
-            'maximise': True,
-            'opt_global': 100 
+            'name': 'OneMax',
+            'type': 'Discrete',
+            'goal': 'Maximization',
+            'dimensions': 100,
+            'opt_global': 100,
+            'PID': 'OneMax_100' 
         }
         base_params = {
             'sol_length': 100,                         # Length of the solution.
@@ -191,9 +192,13 @@ if __name__ == '__main__':
             n_items, capacity, optimal, values, weights, items_dict, problem_info = load_problem_KP(filename)
         
             prob_info = {
-                'name': filename,
-                'maximise': True,
-                'opt_global': optimal 
+                # 'name': filename,
+                'name': 'Knapsack',
+                'type': 'Discrete',
+                'goal': 'Maximization',
+                'dimensions': n_items,
+                'opt_global': optimal,
+                'PID':  filename
             }
             base_params = {
                 'sol_length': n_items,                         # Length of the solution.
@@ -206,10 +211,32 @@ if __name__ == '__main__':
             }
             fitness_functions = [
                 (eval_noisy_kp_v1, {'items_dict': items_dict, 'capacity': capacity}),
-                # (eval_noisy_kp_v2, {'items_dict': items_dict, 'capacity': capacity}),
+                (eval_noisy_kp_v2, {'items_dict': items_dict, 'capacity': capacity}),
                 ]
             basis_experiment(prob_info, base_params, fitness_functions, noise_values, runs)
-    
+    # ---------- Rastrigin ----------
     if 'rastrigin' in selected_problems:
+        for dim in rastrigin_dims:
+            prob_info = {
+                'name': 'Rastrigin',
+                'type': 'Continuous',
+                'goal': 'Minimization',
+                'dimensions': dim,
+                'opt_global': 0.0,
+                'PID': f'Rastrigin_{dim}D'
+            }
+            base_params = {
+                'sol_length': dim,                         # Length of the solution.
+                'opt_weights': (-1.0,),                     # Maximization problem.
+                'eval_limit': eval_limit,                        # Maximum fitness evaluations.
+                'attr_function': Rastrigin_attribute,
+                'starting_solution': None,
+                'target_stop': 0.0,
+                'gen_limit': None
+            }
+            fitness_functions = [
+                (rastrigin_eval, {})
+                ]
+            basis_experiment(prob_info, base_params, fitness_functions, noise_values, runs)
         pass
 

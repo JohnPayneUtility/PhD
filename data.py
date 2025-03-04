@@ -383,7 +383,6 @@ def HC(NGEN, len_sol, weights, attr_function=None, mutate_function=None, purturb
 
 def OnePlusOneEA(len_sol, weights, gens=None, evals=None, target=None, attr_function=None, mutate_function=None, fitness_function=None, starting_solution=None, true_fitness_function=None):
     """
-    
     """
     # Fitness and individual creators
     if not hasattr(creator, "CustomFitness"):
@@ -1052,19 +1051,19 @@ performance_df = pd.DataFrame(columns=[
 ])
 
 problem_names = [
-        # 'f1_l-d_kp_10_269',
+        'f1_l-d_kp_10_269',
         'f2_l-d_kp_20_878',
-        # 'f3_l-d_kp_4_20',
-        # 'f4_l-d_kp_4_11',
-        # 'f5_l-d_kp_15_375',
-        # 'f6_l-d_kp_10_60',
-        # 'f7_l-d_kp_7_50',
-        # 'f8_l-d_kp_23_10000',
-        # 'f9_l-d_kp_5_80',
-        # 'f10_l-d_kp_20_879',
-        # 'knapPI_1_100_1000_1',
-        # 'knapPI_2_100_1000_1',
-        # 'knapPI_3_100_1000_1'
+        'f3_l-d_kp_4_20',
+        'f4_l-d_kp_4_11',
+        'f5_l-d_kp_15_375',
+        'f6_l-d_kp_10_60',
+        'f7_l-d_kp_7_50',
+        'f8_l-d_kp_23_10000',
+        'f9_l-d_kp_5_80',
+        'f10_l-d_kp_20_879',
+        'knapPI_1_100_1000_1',
+        'knapPI_2_100_1000_1',
+        'knapPI_3_100_1000_1'
     ]
 
 if __name__ == "__main__":

@@ -1,5 +1,6 @@
 import dash
-from dash import dcc, html, Input, Output
+from dash import dcc, html, Input, Output, dash_table
+import dash_ag_grid as dag
 import plotly.graph_objs as go
 import networkx as nx
 import numpy as np
@@ -9,8 +10,10 @@ from sklearn.manifold import TSNE
 import os
 import pickle
 import json
+import pandas as pd
 
 from LON_Utilities import convert_to_single_edges_format
+from DashboardHelpers import *
 
 def convert_to_rgba(color, opacity=1.0):
     from matplotlib.colors import to_rgba
@@ -64,6 +67,64 @@ def get_median_run(all_run_trajectories):
 data_folder = 'data'
 folder_options = [{'label': folder, 'value': folder} for folder in os.listdir(data_folder) if os.path.isdir(os.path.join(data_folder, folder))]
 
+
+# column_groups = ['problem_name', 'algo_name', ]
+df = pd.read_pickle('results.pkl')
+print(df.columns)
+
+
+# display_df = df[[col for col in df.columns # filters out list type data
+#                 if not df[col].apply(lambda x: isinstance(x, list)).any()]]
+display_df = df[['problem_name',
+                 'opt_global', 
+                 'fit_func', 
+                 'noise', 
+                 'algo_type',
+                 'algo_name', 
+                 'n_unique_sols', 
+                 'n_gens', 
+                 'n_evals',
+                 'final_fit',
+                 'max_fit',
+                 'min_fit']]
+
+grouping_cols = ['problem_name', 'opt_global', 'fit_func', 'noise', 'algo_name']
+for col in grouping_cols:
+    has_array = display_df[col].apply(lambda x: isinstance(x, np.ndarray)).any()
+    print(f"{col} contains numpy array? {has_array}")
+
+display_df['opt_global'] = display_df['opt_global'].apply(
+    lambda x: x.item() if isinstance(x, np.ndarray) else x
+)
+
+display_grouped_df = display_df.groupby(
+    ['problem_name', 'opt_global', 'fit_func', 'noise', 'algo_name']
+).agg({
+    'n_unique_sols': 'median',
+    'n_gens': 'median',
+    'n_evals': 'median',
+    'final_fit': 'mean',
+    'max_fit': 'max',
+    'min_fit': 'min'
+}).reset_index()
+col_defs = [
+    {"headerName": "Problem", "field": "problem_name", "filter": "agSetColumnFilter", "filterParams": {"excelMode": False}, "sortable": True},
+    {"headerName": "Opt", "field": "opt_global", "filter": "agSetColumnFilter", "sortable": True},
+    {"headerName": "Function", "field": "fit_func", "filter": "agSetColumnFilter", "sortable": True},
+    {"headerName": "Noise (SD)", "field": "noise", "filter": "agSetColumnFilter", "sortable": True},
+    {"headerName": "Algorithm", "field": "algo_name", "filter": "agSetColumnFilter", "sortable": True},
+    {"headerName": "Steps", "field": "n_unique_sols", "filter": "agNumberColumnFilter", "sortable": True},
+    {"headerName": "Generations", "field": "n_gens", "filter": "agNumberColumnFilter", "sortable": True},
+    {"headerName": "Evaluations", "field": "n_evals", "filter": "agNumberColumnFilter", "sortable": True},
+    {"headerName": "Fitness (mean final)", "field": "final_fit", "filter": "agNumberColumnFilter", "sortable": True},
+    {"headerName": "Fitness (max)", "field": "max_fit", "filter": "agNumberColumnFilter", "sortable": True},
+    {"headerName": "Fitness (min)", "field": "min_fit", "filter": "agNumberColumnFilter", "sortable": True}
+]
+
+# col_defs = get_ag_col_defs(display_df)
+# row_data = display_df.to_dict("records")
+
+
 def determine_optimisation_goal(all_trajectories_list):
         first_run = all_trajectories_list[0][0]  # Access the first trajectory
         starting_fitness = first_run[1][0]  # Initial fitness value
@@ -77,6 +138,7 @@ algo_colors = ['blue', 'orange', 'purple', 'brown', 'cyan', 'magenta']
 # Create Dash app
 app = dash.Dash(__name__)
 app.layout = html.Div([
+    # ========== TITLE =========
     html.H1("Search Trajectory Network Dashboard"),
     html.P(
         "This plot visualises the search trajectories of algorithms for optimisation problems. "
@@ -85,6 +147,42 @@ app.layout = html.Div([
         "Edges are directed and connect two consecutive locations of best solutions in the search trajectory. ",
         style={'fontSize': 16, 'marginTop': '10px'}
     ),
+    # ========== MAIN TABLE ==========
+    dag.AgGrid(
+        id="my-grid",
+        className="ag-theme-balham",
+        columnDefs=col_defs,
+        rowData=display_grouped_df.to_dict("records"),
+        defaultColDef={"flex": 1, "minWidth": 50},
+        dashGridOptions={"pagination": True, "paginationPageSize": 12}
+    ),
+    # ---------- Data ----------
+    # dcc.Store(id='stored-data', data=df.to_dict('records')),
+    # --------- Filtering Options ----------
+    # html.Div([
+    #     html.Label("Select Problems:", style={'marginRight': '10px'}),
+    #     dcc.Dropdown(
+    #         id='problem-selection-dropdown',
+    #         options=df['problem_name'].unique().tolist(),
+    #         multi=True,
+    #         value=folder_options[0]['value'] if folder_options else None,
+    #         style={'width': '200px'}
+    #     ),
+    # ], style={'display': 'flex', 'alignItems': 'center', 'marginTop': '20px'}),
+    # --------- Display Table ----------
+    # html.Div(
+    #     dash_table.DataTable(
+    #         data=display_df.to_dict('records'),
+    #         columns=[{"name": col, "id": col} for col in display_df.columns],
+    #         filter_action="native",
+    #         page_size=10,
+    #         # row_selectable="multi",
+    #         style_table={'overflowX': 'scroll'},
+    #         style_cell={'minWidth': '100px', 'width': '100px', 'maxWidth': '100px'},
+    #     ),
+    #     style={'width': 'auto', 'overflowX': 'scroll'}  # Set a fixed width for the container
+    # ),
+    # MORE
     html.Div([
         html.Label("Select problem:", style={'marginRight': '10px'}),
         dcc.Dropdown(

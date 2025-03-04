@@ -70,10 +70,10 @@ def eval_noisy_kp_v2(individual, items_dict, capacity, noise_intensity=0, penalt
 # Continuous Fitness Functions
 # ==============================
 
-def rastrigin_eval(individual, amplitude=10):
+def rastrigin_eval(individual, amplitude=10, noise_intensity=0):
     A = amplitude
     n = len(individual)
-    fitness = A * n + sum((x ** 2 - A * np.cos(2 * np.pi * x)) for x in individual),
+    fitness = A * n + sum((x ** 2 - A * np.cos(2 * np.pi * x)) for x in individual) + random.gauss(0, noise_intensity),
     return fitness
 
 def birastrigin_eval(individual, d=1, s=None):

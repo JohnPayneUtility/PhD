@@ -12,6 +12,9 @@ from deap import tools
 from Algorithms import *
 from FitnessFunctions import *
 
+# ==============================
+# Function to Conduct Single Run
+# ==============================
 def algo_data_single(prob_info: Dict[str, Any], 
                           algorithm_class: Type, 
                           algo_params: Dict[str, Any], 
@@ -45,11 +48,15 @@ def algo_data_single(prob_info: Dict[str, Any],
     
     return {
         "problem_name": prob_info['name'],
-        "maximise": prob_info['maximise'],
+        "problem_type": prob_info['type'],
+        "problem_goal": prob_info['goal'],
+        "dimensions": prob_info['dimensions'],
         "opt_global": prob_info['opt_global'],
+        'PID': prob_info['PID'],
         "fit_func": algo_params['fitness_function'][0].__name__,
         "noise": algo_params['fitness_function'][1]['noise_intensity'],
-        "algo_type": algorithm_class.__name__,
+        "algo_class": algorithm_class.__name__,
+        "algo_type": algo_instance.type,
         "algo_name": algo_instance.name,
         "n_gens": algo_instance.gens,
         "n_evals": algo_instance.evals,
@@ -66,9 +73,9 @@ def algo_data_single(prob_info: Dict[str, Any],
         "seed_signature": seed_signature,
     }
 
-# ----------------------------------------------------------------
-# Function to run multiple experiments (sequentially or in parallel)
-# ----------------------------------------------------------------
+# # ==============================
+# Function to Conduct Multiple Runs (sequentially or in parallel)
+# # ==============================
 def algo_data_multi(prob_info: Dict[str, Any],
                     algorithm_class: Type, 
                     algo_params: Dict[str, Any], 
@@ -111,9 +118,9 @@ def algo_data_multi(prob_info: Dict[str, Any],
     df_sorted = df.sort_values(by='seed')
     return df_sorted
 
-# ----------------------------------------------------------------
+# ==============================
 # Function conduct experiment - gather algo data for range of values
-# ----------------------------------------------------------------
+# ==============================
 
 def run_experiment(prob_info: Dict[str, Any],
                    algorithm_classes: List[Type],

@@ -253,6 +253,13 @@ class MuPlusLamdaEA(OptimisationAlgorithm):
         self.mu = mu
         self.lam = lam
         self.name = f'({mu}+{lam})EA'
+        if mu > 1 and lam > 1:
+            self.type = '(mu+lamda)EA'
+        elif mu > 1:
+            self.type = '(mu+1)EA'
+        elif lam > 1:
+            self.type = '(1+lam)EA'
+        else: self.type = '(1+1)EA'
 
         # Register the mutation operator in the toolbox
         self.toolbox.register("mutate", lambda ind: mutate_function(ind, **mutate_params))
@@ -289,6 +296,7 @@ class PCEA(OptimisationAlgorithm):
         self.evals = 0
         self.pop_size = pop_size
         self.name = f'PCEA(p={pop_size})'
+        self.type = 'PCEA'
 
         # Register the mutation operator in the toolbox
         self.toolbox.register("mate", complementary_crossover)
@@ -340,6 +348,7 @@ class UMDA(OptimisationAlgorithm):
             self.select_size = int(self.pop_size/2)
         else: self.select_size = select_size
         self.name = f'UMDA(p={pop_size})'
+        self.type = 'UMDA'
 
         # Create the initial population of size mu
         self.initialise_population(self.pop_size)
@@ -371,6 +380,7 @@ class CompactGA(OptimisationAlgorithm):
         self.evals = 0
         self.cga_pop_size = pop_size
         self.name = f"cGA(p={pop_size})"
+        self.type = 'cGA'
         # Initialize the probability vector (one value per gene)
         self.p_vector = [0.5] * self.sol_length
         # Record the initial state by sampling a candidate solution.
