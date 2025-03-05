@@ -1,7 +1,8 @@
 import plotly.graph_objects as go
+import plotly.express as px
 import pandas as pd
 
-def plot2d(dataframe, value='final'):
+def plot2d_line(dataframe, value='final'):
     # assert "my_column" in df.columns, "DataFrame must contain column 'my_column'"
     # group_columns = ['algo_name', 'noise']
     df = dataframe.copy()
@@ -43,3 +44,40 @@ def plot2d(dataframe, value='final'):
     )
     # fig = go.Figure(data=[])
     return fig
+
+def plot2d_box(dataframe, value='final'):
+    # assert "my_column" in df.columns, "DataFrame must contain column 'my_column'"
+    # group_columns = ['algo_name', 'noise']
+    df = dataframe.copy()
+    df = df[['algo_name', 'noise', 'final_fit']]
+
+    if value == 'final':
+        stats = df.groupby(['algo_name', 'noise'])['final_fit'].agg(['mean', 'std']).reset_index()
+    
+    # Determine run count
+    # first_algo = stats['algo_name'].iloc[0]
+    # first_algo_df = stats[stats['algo_name'] == first_algo]
+    # run_counts = first_algo_df.size()
+    # runs_per_group = run_counts.iloc[0]
+
+    noise_levels = sorted(df['noise'].unique())
+
+    fig = px.box(
+        df,
+        x="noise",
+        y="final_fit",
+        color="algo_name",
+        category_orders={"noise": noise_levels},
+        points="all"  # optionally, to display all data points
+    )
+
+    fig.update_layout(
+        boxmode="group",  # groups boxes for the same noise level
+        xaxis_title="Noise",
+        yaxis_title="Best solution found",
+        legend_title="Algorithm",
+        template="plotly_white"
+    )
+    # fig = go.Figure(data=[])
+    return fig
+

@@ -6,6 +6,10 @@ import plotly.graph_objects as go
 
 from DashboardHelpers import *
 
+# ==========
+# Data Loading and Formating
+# ==========
+
 # Load your data from the pickle file
 df = pd.read_pickle('results.pkl')
 df['opt_global'] = df['opt_global'].astype(float)
@@ -78,32 +82,59 @@ display2_hidden_cols = [
     'PID'
     ]
 
+# ==========
+# Main Dashboard App
+# ==========
 
 app = dash.Dash(__name__, suppress_callback_exceptions=True)
 # app = dash.Dash(__name__) # Don't suppress exceptions
 
+# ---------- Style settings ----------
+# Common style for unselected tabs
+tab_style = {
+    'height': '30px',
+    'lineHeight': '30px',
+    'fontSize': '14px',
+    'padding': '0px'
+}
+# Common style for selected tabs
+tab_selected_style = {
+    'height': '30px',
+    'lineHeight': '30px',
+    'fontSize': '14px',
+    'padding': '0px',
+    'backgroundColor': '#ddd'  # for example
+}
+
 app.layout = html.Div([
     html.H2("LON/STN Dashboard", style={'textAlign': 'center'}),
     
-    # Hidden stores to preserve selections from Table 1 (Tab 1), Table 1 on Tab 2, and Table 2
+    # Hidden stores to preserve selections from tables
     dcc.Store(id="table1-selected-store", data=[]),
     dcc.Store(id="table1tab2-selected-store", data=[]),
     dcc.Store(id="data-problem-specific", data=[]),
     dcc.Store(id="table2-selected-store", data=[]),
+
+    # Hidden stores for plotting data
     dcc.Store(id="plot_2d_data", data=[]),
     
     # Tabbed section for problem selection
     html.Div([
         dcc.Tabs(id='problemTabSelection', value='p1', children=[
-            dcc.Tab(label='Select problem', value='p1'),
-            dcc.Tab(label='Select additional problem (optional)', value='p2'),
+            dcc.Tab(label='Select problem', 
+                    value='p1', style=tab_style, 
+                    selected_style=tab_selected_style),
+            dcc.Tab(label='Select additional problem (optional)', 
+                    value='p2', 
+                    style=tab_style, 
+                    selected_style=tab_selected_style),
         ]),
         html.Div(id='problemTabsContent'),
     ], style={
         "border": "2px solid #ccc",
         "padding": "10px",
         "borderRadius": "5px",
-        "margin": "10px"
+        "margin": "10px",
     }),
     
     # Table 2 is always visible and is filtered by the union of selections.
@@ -124,19 +155,39 @@ app.layout = html.Div([
     }),
     html.Hr(),
 
-    # 2D Plot
-    dash_table.DataTable(
-        id='simple-table',
-        columns=[{'name': col, 'id': col} for col in df_no_lists.columns],
-        page_size=10,
-        data=[]  # Initially empty, will be updated via callback
-    ),
-    dcc.Graph(id='2d-plot'),
-    
+    # Tabbed section for 2D performance plot
+    html.Div([
+        dcc.Tabs(id='2DPlotTabSelection', value='p1', children=[
+            dcc.Tab(label='Line plot', 
+                    value='p1', style=tab_style, 
+                    selected_style=tab_selected_style),
+            dcc.Tab(label='Box plot', 
+                    value='p2', 
+                    style=tab_style, 
+                    selected_style=tab_selected_style),
+            dcc.Tab(label='Data', 
+                    value='p3', 
+                    style=tab_style, 
+                    selected_style=tab_selected_style),
+        ]),
+        html.Div(id='2DPlotTabContent'),
+    ], style={
+        "border": "2px solid #ccc",
+        "padding": "10px",
+        "borderRadius": "5px",
+        "margin": "10px",
+    }),
+
+    # dash_table.DataTable(
+    #     id='plot_2d_data_table',
+    #     columns=[{'name': col, 'id': col} for col in df_no_lists.columns],
+    #     page_size=10,
+    #     data=[]  # Initially empty, will be updated via callback
+    # ),
 ])
 
 # ------------------------------
-# Callback: Render Tab Content
+# Callback: Render Problem Tab Content
 # ------------------------------
 
 @app.callback(
@@ -145,7 +196,7 @@ app.layout = html.Div([
      Input('table1-selected-store', 'data'),
      Input('table1tab2-selected-store', 'data')]
 )
-def render_content(tab, stored_selection_tab1, stored_selection_tab2):
+def render_content_problem_tab(tab, stored_selection_tab1, stored_selection_tab2):
     if tab == 'p1':
         return html.Div([
             html.Div(
@@ -306,6 +357,7 @@ def update_table2_selected(selected_rows, table2_data):
 # ------------------------------
 # Callback: 2D plot data
 # ------------------------------
+# ---------- Generate data for 2D performance plot by filtering main data with table 2 selection ----------
 filter_columns = [col for col in display2_df.columns]
 @app.callback(
     Output('plot_2d_data', 'data'),
@@ -337,18 +389,61 @@ def update_filtered_view(filtered_data):
     print(df_result.head())
     return df_result.to_dict('records')
 
-# TEMP
-
+# ---------- 2D plot callbacks ----------
+# Plot data table
 @app.callback(
-    [Output('simple-table', 'data'),
-     Output('2d-plot', 'figure')],
+    Output('plot_2d_data_table', 'data'),
+    Input('plot_2d_data', 'data')
+)
+def display_stored_data(data):
+    return data
+
+# 2D line plot
+@app.callback(
+    Output('2DLinePlot', 'figure'),
     Input('plot_2d_data', 'data')
 )
 def display_stored_data(data):
     plot_df = pd.DataFrame(data)
-    plot = plot2d(plot_df)
-    return data, plot
+    plot = plot2d_line(plot_df)
+    return plot
+# 2D bar plot
+@app.callback(
+    Output('2DBoxPlot', 'figure'),
+    Input('plot_2d_data', 'data')
+)
+def display_stored_data(data):
+    plot_df = pd.DataFrame(data)
+    plot = plot2d_box(plot_df)
+    return plot
 
+# ---------- Render 2D plot content in tabbed view ----------
+@app.callback(
+    Output('2DPlotTabContent', 'children'),
+    Input('2DPlotTabSelection', 'value')
+)
+def render_content_2DPlot_tab(tab):
+    if tab == 'p1':
+        return html.Div([
+            dcc.Graph(id='2DLinePlot'),
+        ])
+    elif tab == 'p2':
+        return html.Div([
+            dcc.Graph(id='2DBoxPlot'),
+        ])
+    elif tab == 'p3':
+        return html.Div([
+            dash_table.DataTable(
+                id='plot_2d_data_table',
+                columns=[{'name': col, 'id': col} for col in df_no_lists.columns],
+                page_size=10,
+                data=[],
+                style_table={
+                    'maxWidth': '100%',  # limits the table to the width of the container
+                    'overflowX': 'auto'  # adds a scrollbar if needed
+                },
+            )
+        ])
 
 
 # ==========
