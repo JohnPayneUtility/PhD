@@ -157,6 +157,7 @@ app.layout = html.Div([
 
     # Tabbed section for 2D performance plot
     html.Div([
+        html.H3("2D Performance Plotting"),
         dcc.Tabs(id='2DPlotTabSelection', value='p1', children=[
             dcc.Tab(label='Line plot', 
                     value='p1', style=tab_style, 
@@ -444,7 +445,6 @@ def render_content_2DPlot_tab(tab):
                 },
             )
         ])
-
 
 # ==========
 # RUN
