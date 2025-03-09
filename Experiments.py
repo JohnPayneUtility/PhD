@@ -9,7 +9,7 @@ from FitnessFunctions import *
 # ==============================
 basis_experiment = AlgosVariable
 eval_limit = 10000
-runs = 30
+runs = 10
 selected_problems = [
         # 'onemax',
         'knapsack',

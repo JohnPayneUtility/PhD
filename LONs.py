@@ -269,6 +269,7 @@ def create_binary_LON(prob_info,
     n_items = base_params['sol_length']
     fit_weights = base_params['opt_weights']
     binary_attribute = base_params['attr_function']
+    base_seed = 0
 
     aggregated_lon_data = {
         "local_optima": [],
@@ -277,6 +278,9 @@ def create_binary_LON(prob_info,
         }
     
     for i in trange(n_runs, desc="Computing LON"):
+        seed = base_seed + i
+        random.seed(seed)
+        np.random.seed(seed)
         local_optima, fitness_values, edges_list = BinaryLON(pert_attempts, 
                                                             n_items, 
                                                             fit_weights, 
