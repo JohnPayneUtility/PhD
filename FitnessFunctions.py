@@ -3,6 +3,13 @@ import numpy as np
 import random
 
 # ==============================
+
+def mean_weight(items_dict):
+    total_weight = sum(weight for _, weight in items_dict.values())
+    mean_weight = total_weight / len(items_dict)
+    return mean_weight
+
+# ==============================
 # Combinatorial Fitness Functions
 # ==============================
 
@@ -36,7 +43,7 @@ def eval_noisy_kp_v1(individual, items_dict, capacity, noise_intensity=0, penalt
     weight = sum(items_dict[i][1] * individual[i] for i in range(n_items)) # Calc solution weight
     value = sum(items_dict[i][0] * individual[i] for i in range(n_items)) # Calc solution value
     
-    noise = random.gauss(0, noise_intensity)
+    noise = random.gauss(0, noise_intensity * mean_weight(items_dict))
     weight = weight + noise
 
     # Check if over capacity and return reduced value
@@ -54,7 +61,7 @@ def eval_noisy_kp_v2(individual, items_dict, capacity, noise_intensity=0, penalt
     weight = sum(items_dict[i][1] * individual[i] for i in range(n_items)) # Calc solution weight
     value = sum(items_dict[i][0] * individual[i] for i in range(n_items)) # Calc solution value
     
-    noise = random.gauss(0, noise_intensity)
+    noise = random.gauss(0, noise_intensity * mean_weight(items_dict))
     value = value + noise
 
     # Check if over capacity and return reduced value

@@ -1,128 +1,25 @@
 from RunManager import *
-import pandas as pd
-import os
 from ProblemScripts import load_problem_KP
-
-
-# ==============================
-# Helper Functions
-# ==============================
-
-def save_or_append_results(df: pd.DataFrame, filename: str = 'results.pkl') -> None:
-    """
-    """
-    if os.path.exists(filename):
-        # Load the existing DataFrame
-        existing_df = pd.read_pickle(filename)
-        # Concatenate the existing and new DataFrames
-        full_df = pd.concat([existing_df, df], ignore_index=True)
-        # Save the combined DataFrame
-        full_df.to_pickle(filename)
-    else:
-        # If the file doesn't exist, simply save the new DataFrame
-        df.to_pickle(filename)
-
-# ==============================
-# Basis Experiment Runs
-# ==============================
-
-def TwoAlgosTuned(prob_info, base_params, fitness_functions, noise_values, runs):
-    algorithm_classes = [MuPlusLamdaEA, UMDA]
-    extra_params_by_algo = {
-        'MuPlusLamdaEA': [
-            {'mu': 1, 'lam': 1, 'mutate_function': tools.mutFlipBit, 'mutate_params': {'indpb': 1/100}},
-        ],
-        'UMDA': [
-            {'pop_size': 35},
-        ]
-    }
-    results_df = run_experiment(prob_info,
-                                algorithm_classes,
-                                fitness_functions,
-                                noise_values,
-                                extra_params_by_algo,
-                                base_params,
-                                num_runs=runs,
-                                base_seed=0,
-                                parallel=True)
-    pd.set_option('display.max_columns', None)
-    # print(results_df.head(20))
-    save_or_append_results(results_df)
-    print(f"Completed problem {prob_info['name']}")
-
-def FiveAlgosTuned(prob_info, base_params, fitness_functions, noise_values, runs):
-    algorithm_classes = [MuPlusLamdaEA, PCEA, UMDA, CompactGA]
-    extra_params_by_algo = {
-        'MuPlusLamdaEA': [
-            {'mu': 1, 'lam': 1, 'mutate_function': tools.mutFlipBit, 'mutate_params': {'indpb': 1/100}},
-            {'mu': 5, 'lam': 1, 'mutate_function': tools.mutFlipBit, 'mutate_params': {'indpb': 1/100}},
-        ],
-        'PCEA': [
-            {'pop_size': 22},
-        ],
-        'UMDA': [
-            {'pop_size': 35},
-        ],
-        'CompactGA': [
-            {'pop_size': 22},
-        ]
-    }
-    results_df = run_experiment(prob_info,
-                                algorithm_classes,
-                                fitness_functions,
-                                noise_values,
-                                extra_params_by_algo,
-                                base_params,
-                                num_runs=runs,
-                                base_seed=0,
-                                parallel=True)
-    pd.set_option('display.max_columns', None)
-    # print(results_df.head(20))
-    save_or_append_results(results_df)
-    print(f"Completed problem {prob_info['name']}")
-
-def FourAlgos(prob_info, base_params, fitness_functions, noise_values, runs):
-    algorithm_classes = [MuPlusLamdaEA, PCEA, UMDA]
-    extra_params_by_algo = {
-        'MuPlusLamdaEA': [
-            {'mu': 1, 'lam': 1, 'mutate_function': tools.mutFlipBit, 'mutate_params': {'indpb': 1/100}},
-            {'mu': 100, 'lam': 1, 'mutate_function': tools.mutFlipBit, 'mutate_params': {'indpb': 1/100}},
-        ],
-        'PCEA': [
-            {'pop_size': 100},
-        ],
-        'UMDA': [
-            {'pop_size': 100},
-        ],
-    }
-    results_df = run_experiment(prob_info,
-                                algorithm_classes,
-                                fitness_functions,
-                                noise_values,
-                                extra_params_by_algo,
-                                base_params,
-                                num_runs=runs,
-                                base_seed=0,
-                                parallel=True)
-    pd.set_option('display.max_columns', None)
-    # print(results_df.head(20))
-    save_or_append_results(results_df)
-    print(f"Completed problem {prob_info['name']}")
+from ExperimentsHelpers import *
+from LONs import *
+from FitnessFunctions import *
 
 # ==============================
 # Experiment Settings
 # ==============================
-basis_experiment = FourAlgos
+basis_experiment = AlgosVariable
 eval_limit = 10000
 runs = 30
 selected_problems = [
-        'onemax',
+        # 'onemax',
         'knapsack',
-        'rastrigin',
+        # 'rastrigin',
     ]
 noise_values = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-noise_values = [0, 3, 6, 9]
+eval_limits = [38392, 38392, 41066, 44477, 50728, 56851, 64079, 70736, 79034, 86078, 93638]
 
+noise_values = [0, 3, 6, 9]
+eval_limits = [38392, 44477, 64079, 86078]
 
 
 # ==============================
@@ -134,7 +31,7 @@ kp_problems = [
     ('f1_l-d_kp_10_269', 295),
     # ('f2_l-d_kp_20_878', 1024),
     # ('f3_l-d_kp_4_20', 35),
-    # ('f4_l-d_kp_4_11', 23),
+    ('f4_l-d_kp_4_11', 23),
     # ('f5_l-d_kp_15_375', 481.0694),
     # ('f6_l-d_kp_10_60', 52),
     # ('f7_l-d_kp_7_50', 107),
@@ -184,7 +81,7 @@ if __name__ == '__main__':
             'gen_limit': None
         }
         fitness_functions = [(OneMax_fitness, {})]
-        basis_experiment(prob_info, base_params, fitness_functions, noise_values, runs)
+        basis_experiment(prob_info, base_params, fitness_functions, noise_values, runs, eval_limits = eval_limits)
     
     # ---------- KNAPSACK ----------
     if 'knapsack' in selected_problems:
@@ -213,7 +110,18 @@ if __name__ == '__main__':
                 (eval_noisy_kp_v1, {'items_dict': items_dict, 'capacity': capacity}),
                 (eval_noisy_kp_v2, {'items_dict': items_dict, 'capacity': capacity}),
                 ]
-            basis_experiment(prob_info, base_params, fitness_functions, noise_values, runs)
+            # Create STNs
+            basis_experiment(prob_info, base_params, fitness_functions, noise_values, runs, eval_limits = eval_limits)
+            # Create LONs
+            LON_fit_func = (eval_ind_kp, {'items_dict': items_dict, 'capacity': capacity, 'penalty': 1})
+            create_binary_LON(prob_info,
+                      base_params,
+                      n_flips_mut = 1,
+                      n_flips_pert = 2,
+                      pert_attempts = 1500,
+                      fitness_function = LON_fit_func,
+                      n_runs = 100,
+                      compression_accs = [0, 1, 2, 5, 10])
     # ---------- Rastrigin ----------
     if 'rastrigin' in selected_problems:
         for dim in rastrigin_dims:

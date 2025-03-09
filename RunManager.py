@@ -10,7 +10,7 @@ from typing import List, Tuple, Any, Dict, Type
 from deap import tools
 
 from Algorithms import *
-from FitnessFunctions import *
+
 
 # ==============================
 # Function to Conduct Single Run
@@ -60,6 +60,7 @@ def algo_data_single(prob_info: Dict[str, Any],
         "algo_name": algo_instance.name,
         "n_gens": algo_instance.gens,
         "n_evals": algo_instance.evals,
+        # add eval limit
         "stop_trigger": algo_instance.stop_trigger,
         "n_unique_sols": len(unique_sols),
         "unique_sols": unique_sols,
@@ -128,38 +129,45 @@ def run_experiment(prob_info: Dict[str, Any],
                    noise_values: List[float],
                    extra_params_by_algo: Dict[str, List[Dict[str, Any]]],
                    base_params: Dict[str, Any],
+                   eval_limits: Optional[List[int]] = None,
                    num_runs: int = 10,
                    base_seed: int = 0,
                    parallel: bool = False) -> pd.DataFrame:
     """
     Run experiments over all combinations of settings for different algorithms.
-    
-    For each algorithm class, the function retrieves its appropriate extra parameter list
-    (if any). Then it loops over every combination of fitness functions, noise values,
-    and extra parameters. For each combination it runs algo_data_multi and adds identifying
-    columns to the DataFrame.
-    
-    Returns:
-      A Pandas DataFrame with one row per experiment run.
     """
     results_list = []
+
+    # Pair noise values with eval limits if provided
+    if eval_limits is not None:
+        assert len(eval_limits) == len(noise_values), \
+            "Length of eval_limits must match noise_values."
+        noise_eval_pairs = list(zip(noise_values, eval_limits))
+    else:
+        noise_eval_pairs = [(noise, base_params['eval_limit']) for noise in noise_values]
+
     for algo_class in tqdm(algorithm_classes, desc="Algorithm classes"):
-        # Get extra parameters specific to this algorithm; use [{}] if none specified.
         extra_param_list = extra_params_by_algo.get(algo_class.__name__, [{}])
-        # get combinations for tqdm
-        combinations = list(itertools.product(fitness_functions, noise_values, extra_param_list))
-        # for fitness_fn, noise, extra_params in itertools.product(fitness_functions, noise_values, extra_param_list):
-        for fitness_fn, noise, extra_params in tqdm(combinations, 
-                                                    desc=f"Running {algo_class.__name__} configs",
-                                                    leave=False):
-            # Merge base_params with the algorithm-specific extra parameters.
+        combinations = list(itertools.product(fitness_functions, noise_eval_pairs, extra_param_list))
+
+        for fitness_fn, (noise, eval_limit), extra_params in tqdm(combinations,
+                                                                  desc=f"Running {algo_class.__name__} configs",
+                                                                  leave=False):
             params = base_params.copy()
             params.update(extra_params)
-            # Update the fitness function tuple with the noise value.
-            # params['fitness_function'] = (fitness_fn[0], {'noise_intensity': noise})
-            # # For the true fitness function, assume noise is 0.
-            # params['true_fitness_function'] = (fitness_fn[0], {'noise_intensity': 0})
-            fit_params = fitness_fn[1].copy()  # copy the original parameters
+
+            # Evaluate callable parameters dynamically based on noise
+            callable_params_keys = {'pop_size', 'mu', 'lam', 'eval_limit', 'mutate_params'}
+
+            for key in callable_params_keys:
+                if key in params and callable(params[key]):
+                    params[key] = params[key](params['sol_length'], noise)
+
+            # Set the eval_limit dynamically
+            params['eval_limit'] = eval_limit  # Already extracted from noise_eval_pairs
+
+            # Update fitness function with noise
+            fit_params = fitness_fn[1].copy()
             fit_params.update({'noise_intensity': noise})
             params['fitness_function'] = (fitness_fn[0], fit_params)
 
