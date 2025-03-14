@@ -11,7 +11,7 @@ basis_experiment = AlgosVariable
 eval_limit = 10000
 runs = 10
 selected_problems = [
-        # 'onemax',
+        'onemax',
         'knapsack',
         # 'rastrigin',
     ]
@@ -114,14 +114,14 @@ if __name__ == '__main__':
             basis_experiment(prob_info, base_params, fitness_functions, noise_values, runs, eval_limits = eval_limits)
             # Create LONs
             LON_fit_func = (eval_ind_kp, {'items_dict': items_dict, 'capacity': capacity, 'penalty': 1})
-            create_binary_LON(prob_info,
-                      base_params,
-                      n_flips_mut = 1,
-                      n_flips_pert = 2,
-                      pert_attempts = 1500,
-                      fitness_function = LON_fit_func,
-                      n_runs = 100,
-                      compression_accs = [0, 1, 2, 5, 10])
+            # create_binary_LON(prob_info,
+            #           base_params,
+            #           n_flips_mut = 1,
+            #           n_flips_pert = 2,
+            #           pert_attempts = 1500,
+            #           fitness_function = LON_fit_func,
+            #           n_runs = 100,
+            #           compression_accs = [0, 1, 2, 5, 10])
     # ---------- Rastrigin ----------
     if 'rastrigin' in selected_problems:
         for dim in rastrigin_dims:

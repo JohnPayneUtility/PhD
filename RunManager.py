@@ -43,7 +43,7 @@ def algo_data_single(prob_info: Dict[str, Any],
     algo_instance.run()  # This updates the instance's internal data.
     
     # Retrieve derived data from the run.
-    unique_sols, unique_fits, sol_iterations, sol_transitions = algo_instance.get_trajectory_data()
+    unique_sols, unique_fits, noisy_fits, sol_iterations, sol_transitions = algo_instance.get_trajectory_data()
     seed_signature = algo_instance.seed_signature
     
     return {
@@ -65,6 +65,7 @@ def algo_data_single(prob_info: Dict[str, Any],
         "n_unique_sols": len(unique_sols),
         "unique_sols": unique_sols,
         "unique_fits": unique_fits,
+        "noisy_fits": noisy_fits,
         "final_fit": unique_fits[-1],
         "max_fit": max(unique_fits),
         "min_fit": min(unique_fits),

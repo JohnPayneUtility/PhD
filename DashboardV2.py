@@ -14,6 +14,7 @@ from DashboardHelpers import *
 # Data Loading and Formating
 # ==========
 
+# ---------- LON DATA ----------
 # Load local optima
 df_LONs = pd.read_pickle('results_LON.pkl')
 print(f'df_LON columns: {df_LONs.columns}')
@@ -29,6 +30,8 @@ LON_hidden_cols = ['problem_name',
                    ]
 LON_display_columns = [col for col in df_LONs.columns if col not in LON_hidden_cols]
 
+# ----------
+
 # Load your data from the pickle file
 df = pd.read_pickle('results.pkl')
 df['opt_global'] = df['opt_global'].astype(float)
@@ -38,6 +41,7 @@ df_no_lists = df.copy()
 df_no_lists.drop([
     'unique_sols',
     'unique_fits',
+    'noisy_fits',
     'sol_iterations',
     'sol_transitions',
 ], axis=1, inplace=True)
@@ -84,6 +88,7 @@ display2_df.drop([
     'n_unique_sols',
     'unique_sols',
     'unique_fits',
+    'noisy_fits',
     'final_fit',
     'max_fit',
     'min_fit',
@@ -140,6 +145,7 @@ app.layout = html.Div([
     dcc.Store(id="LON_data", data=[]),
     dcc.Store(id="STN_data_processed", data=[]),
     dcc.Store(id="STN_series_labels", data=[]),
+    dcc.Store(id="noisy_fitnesses_data", data=[]),
     
     # Tabbed section for problem selection
     html.Div([
@@ -261,7 +267,7 @@ app.layout = html.Div([
             {'label': 'Use strength for LON node size', 'value': 'LON_node_strength'},
             {'label': 'Colour LON by fitness', 'value': 'local_optima_color'}
         ],
-        value=[]
+        value=['plot_3D', 'LON_node_strength']  # Set default values
     ),
     dcc.Dropdown(
         id='layout',
@@ -340,7 +346,7 @@ app.layout = html.Div([
     min=1,
     max=100,
     step=1,
-    value=50,  # Default scaling factor
+    value=5,  # Default scaling factor
     marks={i: str(i) for i in range(1, 100, 10)},
     tooltip={"placement": "bottom", "always_visible": False}
     ),
@@ -765,51 +771,29 @@ def update_filtered_view(selected_rows, table2_data):
     # print(df_result.columns)
     return df_result.to_dict('records')
 
-# Create processed STN data for plotting
-# @app.callback(
-#     Output('STN_data_processed', 'data'),
-#     Input('STN_data', 'data'),
-# )
-# def process_STN_data(df):
-#     df = pd.DataFrame(df)
-#     # print(df.head())
-#     algo_names = df['algo_name'].unique().tolist()
-#     STN_data = []
-#     for algo_name in algo_names:
-#         # Filter the rows corresponding to the current algorithm
-#         algo_data = df[df['algo_name'] == algo_name]
-#         runs = []
-#         # Each row is a run
-#         for _, row in algo_data.iterrows():
-#             run = [
-#                 row['unique_sols'],       # Unique solutions for the run
-#                 row['unique_fits'],       # Unique fitnesses for the run
-#                 row['sol_iterations'],    # Iterations for the run
-#                 row['sol_transitions']    # Transitions for the run
-#             ]
-#             runs.append(run)
-#         STN_data.append(runs)
-#     return STN_data
-
 @app.callback(
     [Output('STN_data_processed', 'data'),
-     Output('STN_series_labels', 'data')],
+     Output('STN_series_labels', 'data'),
+     Output('noisy_fitnesses_data', 'data')],
     Input('STN_data', 'data'),
 )
 def process_STN_data(df, group_cols=['algo_name', 'noise']):
     df = pd.DataFrame(df)
     STN_data = []
     STN_series = []
+    Noise_data = []
     
     # Group by multiple columns
     grouped = df.groupby(group_cols)
     
     for group_key, group_df in grouped:
         runs = []
+
         for _, row in group_df.iterrows():
             run = [
                 row['unique_sols'],
                 row['unique_fits'],
+                row['noisy_fits'],
                 row['sol_iterations'],
                 row['sol_transitions']
             ]
@@ -819,7 +803,7 @@ def process_STN_data(df, group_cols=['algo_name', 'noise']):
         STN_data.append(runs)
         STN_series.append(group_key)
     
-    return STN_data, STN_series
+    return STN_data, STN_series, Noise_data
 
 @app.callback(
     Output('print_STN_series_labels', "children"),
@@ -853,9 +837,10 @@ algo_colors = ['blue', 'orange', 'purple', 'brown', 'cyan', 'magenta']
      Input('local-optima-node-opacity-slider', 'value'),
      Input('local-optima-edge-opacity-slider', 'value'),
      Input('STN-node-opacity-slider', 'value'),
-     Input('STN-edge-opacity-slider', 'value')]
+     Input('STN-edge-opacity-slider', 'value'),
+     Input('noisy_fitnesses_data', 'data')]
 )
-def update_plot(options, run_options, layout_value, hover_info_value, all_trajectories_list, n_runs_display, local_optima, use_range_slider, x_slider, y_slider, node_size_slider, LON_edge_size_slider, STN_edge_size_slider, LON_node_opac, LON_edge_opac, STN_node_opac, STN_edge_opac):
+def update_plot(options, run_options, layout_value, hover_info_value, all_trajectories_list, n_runs_display, local_optima, use_range_slider, x_slider, y_slider, node_size_slider, LON_edge_size_slider, STN_edge_size_slider, LON_node_opac, LON_edge_opac, STN_node_opac, STN_edge_opac, noisy_fitnesses_list):
     # Options from checkboxes
     show_labels = 'show_labels' in options
     hide_STN_nodes = 'hide_STN_nodes' in options
@@ -887,9 +872,47 @@ def update_plot(options, run_options, layout_value, hover_info_value, all_trajec
     overall_best_fitness = 0
     overall_best_node = None
     
-    # Function to add nodes and edges to the graph
+    # # Function to add nodes and edges to the graph
+    # def add_trajectories_to_graph(all_run_trajectories, edge_color):
+    #     for run_idx, (unique_solutions, unique_fitnesses, _, solution_iterations, transitions) in enumerate(all_run_trajectories):
+    #         for i, solution in enumerate(unique_solutions):
+    #             solution_tuple = tuple(solution)
+    #             if solution_tuple not in node_mapping:
+    #                 node_label = f"Solution {len(node_mapping) + 1}"
+    #                 node_mapping[solution_tuple] = node_label
+    #                 G.add_node(node_label, solution=solution, fitness=unique_fitnesses[i], iterations=solution_iterations[i], run_idx=run_idx, step=i)
+    #             else:
+    #                 node_label = node_mapping[solution_tuple]
+
+    #             # Set start and end nodes for coloring later
+    #             if i == 0:
+    #                 start_nodes.add(node_label)
+    #             if i == len(unique_solutions) - 1:
+    #                 end_nodes.add(node_label)
+
+    #         # Add edges based on transitions
+    #         for j, (prev_solution, current_solution) in enumerate(transitions):
+    #             prev_solution = tuple(prev_solution)
+    #             current_solution = tuple(current_solution)
+    #             if prev_solution in node_mapping and current_solution in node_mapping:
+    #                 G.add_edge(node_mapping[prev_solution], node_mapping[current_solution], weight=STN_edge_size_slider, color=edge_color)
+    
     def add_trajectories_to_graph(all_run_trajectories, edge_color):
-        for run_idx, (unique_solutions, unique_fitnesses, solution_iterations, transitions) in enumerate(all_run_trajectories):
+        for run_idx, entry in enumerate(all_run_trajectories):
+            if len(entry) != 5:
+                print(f"Skipping malformed entry {entry}, expected 5 elements but got {len(entry)}")
+                continue
+            
+            unique_solutions, unique_fitnesses, noisy_fitnesses, solution_iterations, transitions = entry
+
+            if any(x is None for x in (unique_solutions, unique_fitnesses, noisy_fitnesses, solution_iterations, transitions)):
+                print(f"Skipping run {run_idx} due to None values: {entry}")
+                continue
+
+            print(unique_fitnesses)
+            print(noisy_fitnesses)
+            noisy_fitnesses = [int(fit) for fit in noisy_fitnesses]
+            print(noisy_fitnesses)
             for i, solution in enumerate(unique_solutions):
                 solution_tuple = tuple(solution)
                 if solution_tuple not in node_mapping:
@@ -898,6 +921,17 @@ def update_plot(options, run_options, layout_value, hover_info_value, all_trajec
                     G.add_node(node_label, solution=solution, fitness=unique_fitnesses[i], iterations=solution_iterations[i], run_idx=run_idx, step=i)
                 else:
                     node_label = node_mapping[solution_tuple]
+
+                # Add noisy fitness node
+                noisy_node_label = f"Noisy {node_label}"
+                if noisy_node_label not in G.nodes:
+                    print(f"Existing nodes: {list(G.nodes())}")
+                    print(f"Adding node: {noisy_node_label} with fitness {noisy_fitnesses[i]}")
+                    try:
+                        G.add_node(noisy_node_label, solution=solution, fitness=noisy_fitnesses[i])
+                    except Exception as e:
+                        print(f"Error adding noisy node: {noisy_node_label}, {e}")
+                    G.add_edge(node_label, noisy_node_label, weight=STN_edge_size_slider, color='gray', style='dotted')
 
                 # Set start and end nodes for coloring later
                 if i == 0:
@@ -911,14 +945,17 @@ def update_plot(options, run_options, layout_value, hover_info_value, all_trajec
                 current_solution = tuple(current_solution)
                 if prev_solution in node_mapping and current_solution in node_mapping:
                     G.add_edge(node_mapping[prev_solution], node_mapping[current_solution], weight=STN_edge_size_slider, color=edge_color)
-    
+
     # Add trajectory nodes if provided
     if all_trajectories_list:
         # Determine optimisation goal
+        
         optimisation_goal = determine_optimisation_goal(all_trajectories_list)
 
         # Add all sets of trajectories to the graph
+        # print(f"Checking all_trajectories_list: {all_trajectories_list}")
         for idx, all_run_trajectories in enumerate(all_trajectories_list):
+            # print(f"Checking all_run_trajectories: {all_run_trajectories}")
             edge_color = algo_colors[idx % len(algo_colors)]  # Cycle through colors if there are more sets than colors
 
             selected_trajectories = []
@@ -935,16 +972,16 @@ def update_plot(options, run_options, layout_value, hover_info_value, all_trajec
                 selected_trajectories.extend(select_top_runs_by_fitness(all_run_trajectories, 1, anti_optimisation_goal))
 
             add_trajectories_to_graph(selected_trajectories, edge_color)
-        
+
 
         # Find the overall best solution across all sets of trajectories
         if optimisation_goal == "max":
             overall_best_fitness = max(
-                max(best_fitnesses) for all_run_trajectories in all_trajectories_list for _, best_fitnesses, _, _ in all_run_trajectories
+                max(best_fitnesses) for all_run_trajectories in all_trajectories_list for _, best_fitnesses, _, _, _ in all_run_trajectories
             )
         else:  # Minimisation
             overall_best_fitness = min(
-                min(best_fitnesses) for all_run_trajectories in all_trajectories_list for _, best_fitnesses, _, _ in all_run_trajectories
+                min(best_fitnesses) for all_run_trajectories in all_trajectories_list for _, best_fitnesses, _, _, _ in all_run_trajectories
             )
     
     # Add local optima nodes if provided
@@ -1053,10 +1090,13 @@ def update_plot(options, run_options, layout_value, hover_info_value, all_trajec
                 node_colors.append(convert_to_rgba('black', LON_node_opac))
         else:
             # Check if the node exists in multiple sets of trajectories
-            solution_tuple = next(key for key, value in node_mapping.items() if value == node)
+            solution_tuple = next((key for key, value in node_mapping.items() if value == node), None)
+            if solution_tuple is None:
+                # Handle the missing mapping appropriately, e.g. skip this node or log an error.
+                continue
             count_in_sets = 0
             for all_run_trajectories in all_trajectories_list:
-                for unique_solutions, _, _, _ in all_run_trajectories:
+                for unique_solutions, _, _, _, _ in all_run_trajectories:
                     if solution_tuple in set(tuple(sol) for sol in unique_solutions):
                         count_in_sets += 1
             if count_in_sets > 1:
@@ -1118,7 +1158,7 @@ def update_plot(options, run_options, layout_value, hover_info_value, all_trajec
         pos = nx.kamada_kawai_layout(G, dim=2 if not plot_3D else 3)
     else:
         pos = nx.spring_layout(G, dim=2 if not plot_3D else 3)
-    
+
     # create node_hover_text which holds node hover text information
     node_hover_text = []
     if hover_info_value == 'fitness':

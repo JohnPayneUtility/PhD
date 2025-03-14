@@ -108,20 +108,22 @@ def record_population_state(data, population, toolbox, true_fitness_function):
     else:
         true_fitnesses.append(best_individual.fitness.values[0])
 
-def extract_trajectory_data(best_solutions, best_fitnesses):
+def extract_trajectory_data(best_solutions, best_fitnesses, true_fitnesses):
     # Extract unique solutions and their corresponding fitness values
     unique_solutions = []
     unique_fitnesses = []
+    noisy_fitnesses = []
     solution_iterations = []
     seen_solutions = {}
 
-    for solution, fitness in zip(best_solutions, best_fitnesses):
+    for solution, fitness, true_fitness in zip(best_solutions, best_fitnesses, true_fitnesses):
         # Convert solution to a tuple to make it hashable
         solution_tuple = tuple(solution)
         if solution_tuple not in seen_solutions:
             seen_solutions[solution_tuple] = 1
             unique_solutions.append(solution)
-            unique_fitnesses.append(fitness)
+            unique_fitnesses.append(true_fitness)
+            noisy_fitnesses.append(fitness)
         else:
             seen_solutions[solution_tuple] += 1
 
@@ -130,7 +132,7 @@ def extract_trajectory_data(best_solutions, best_fitnesses):
         solution_tuple = tuple(solution)
         solution_iterations.append(seen_solutions[solution_tuple])
 
-    return unique_solutions, unique_fitnesses, solution_iterations
+    return unique_solutions, unique_fitnesses, noisy_fitnesses, solution_iterations
 
 def extract_transitions(unique_solutions):
     # Extract transitions between solutions over generations
@@ -230,9 +232,9 @@ class OptimisationAlgorithm:
         return self.best_solutions, self.best_fitnesses, self.true_fitnesses
     
     def get_trajectory_data(self):
-        unique_sols, unique_fits, sol_iterations = extract_trajectory_data(self.best_solutions, self.true_fitnesses)
+        unique_sols, unique_fits, noisy_fitnesses, sol_iterations = extract_trajectory_data(self.best_solutions, self.best_fitnesses, self.true_fitnesses)
         sol_transitions = extract_transitions(unique_sols)
-        return unique_sols, unique_fits, sol_iterations, sol_transitions
+        return unique_sols, unique_fits, noisy_fitnesses, sol_iterations, sol_transitions
 
 # ==============================
 # Evolutionary Algorithm Subclasses
