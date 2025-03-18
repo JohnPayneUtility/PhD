@@ -36,7 +36,7 @@ def inverse_n_mut_rate(n_items, noise):
 # ===============================
 
 def AlgosVariable(prob_info, base_params, fitness_functions, noise_values, runs, eval_limits = None):
-    algorithm_classes = [MuPlusLamdaEA, UMDA]
+    algorithm_classes = [MuPlusLamdaEA]
     extra_params_by_algo = {
         'MuPlusLamdaEA': [
             # {'mu': 1, 'lam': 1, 'mutate_function': tools.mutFlipBit, 'mutate_params': {'indpb': 1/100}},

@@ -205,3 +205,35 @@ def convert_to_single_edges_format(data):
     #     converted_data["edges"][(source, target)] = weight
 
     return converted_data
+
+def quadratic_bezier(start, end, curvature=0.2, n_points=20):
+    """
+    Computes a set of points for a quadratic Bézier curve between start and end.
+    curvature: fraction of the distance to offset the midpoint perpendicular to the line.
+    n_points: number of points along the curve.
+    """
+    start = np.array(start)
+    end = np.array(end)
+    # Compute the midpoint.
+    mid = (start + end) / 2.0
+    
+    # Compute the perpendicular vector.
+    direction = end - start
+    if np.all(direction == 0):
+        # Prevent division by zero if start equals end.
+        return np.array([start])
+    perp = np.array([-direction[1], direction[0]])
+    perp = perp / np.linalg.norm(perp)
+    
+    # Offset the midpoint by a fraction of the distance.
+    distance = np.linalg.norm(direction)
+    control = mid + curvature * distance * perp
+    
+    # Generate points along the quadratic Bézier curve.
+    t_values = np.linspace(0, 1, n_points)
+    curve_points = []
+    for t in t_values:
+        point = (1 - t)**2 * start + 2 * (1 - t) * t * control + t**2 * end
+        curve_points.append(point)
+    
+    return np.array(curve_points)

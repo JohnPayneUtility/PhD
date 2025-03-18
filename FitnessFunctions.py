@@ -44,7 +44,7 @@ def eval_noisy_kp_v1(individual, items_dict, capacity, noise_intensity=0, penalt
     value = sum(items_dict[i][0] * individual[i] for i in range(n_items)) # Calc solution value
     
     noise = random.gauss(0, noise_intensity * mean_weight(items_dict))
-    weight = weight + noise
+    value = value + noise
 
     # Check if over capacity and return reduced value
     if weight > capacity:

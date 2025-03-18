@@ -10,6 +10,8 @@ from sklearn.manifold import TSNE
 
 from DashboardHelpers import *
 
+import logging
+
 # ==========
 # Data Loading and Formating
 # ==========
@@ -53,6 +55,8 @@ display1_df = display1_df[['problem_type',
                            'problem_name',
                            'dimensions',
                            'opt_global',
+                        #    'mean_value',
+                        #    'mean_weight',
                            'PID']].drop_duplicates()
 
 # For Table 2, group and aggregate data
@@ -818,7 +822,6 @@ def update_table2_selected(series_list):
 # ==========
 # plot
 # ==========
-algo_colors = ['blue', 'orange', 'purple', 'brown', 'cyan', 'magenta']
 @app.callback(
     Output('trajectory-plot', 'figure'),
     [Input('options', 'value'),
@@ -859,11 +862,13 @@ def update_plot(options, run_options, layout_value, hover_info_value, all_trajec
     # Options from dropdowns
     layout = layout_value
 
-    G = nx.DiGraph()
+    # G = nx.DiGraph()
+    G = nx.MultiDiGraph()
 
     # Colors for different sets of trajectories
-    # algo_colors = ['blue', 'orange', 'purple', 'brown', 'cyan', 'magenta']
+    algo_colors = ['blue', 'orange', 'purple', 'brown', 'cyan', 'magenta']
     node_color_shared = 'green'
+    option_curve_edges = False
 
     # Add nodes and edges for each set of trajectories
     node_mapping = {}  # To ensure unique solutions map to the same node
@@ -1021,12 +1026,67 @@ def update_plot(options, run_options, layout_value, hover_info_value, all_trajec
 
         max_weight = max(local_optima["edges"].values(), default=1)
 
+        # ---------- check for duplicate edges ----------
+        from collections import Counter
+
+        # Suppose raw_edges is a list of tuples, e.g., [(source, target), (source, target), ...]
+        raw_edges = list(local_optima["edges"].keys())  # or however you obtain your raw list
+
+        # Check for duplicate edges
+        edge_counts = Counter(raw_edges)
+        duplicates = {edge: count for edge, count in edge_counts.items() if count > 1}
+
+        if duplicates:
+            print("Duplicate edges found:")
+            for edge, count in duplicates.items():
+                print(f"Edge {edge} appears {count} times")
+        else:
+            print("No duplicate edges found")
+        
+        # Check for bidirectional edges
+        bidirectional_edges = []
+        for (node1, node2) in edge_counts:
+            if (node2, node1) in edge_counts:
+                # To avoid reporting each bidirectional pair twice, ensure a consistent order
+                if node1 <= node2:
+                    bidirectional_edges.append((node1, node2))
+
+        if bidirectional_edges:
+            print("Bidirectional edges found:")
+            fitness_mapping = {}
+            for opt, fitness in zip(local_optima["local_optima"], local_optima["fitness_values"]):
+                fitness_mapping[tuple(opt)] = fitness
+            for edge in bidirectional_edges:
+                fitness1 = fitness_mapping.get(edge[0], "N/A")
+                fitness2 = fitness_mapping.get(edge[1], "N/A")
+                print(f"Edge {edge} exists in both directions. Fitness: {edge[0]} = {fitness1}, {edge[1]} = {fitness2}")
+        else:
+            print("No bidirectional edges found")
+        
+        # ------
+
+        # add nodes for LON
         for opt, fitness in zip(local_optima["local_optima"], local_optima["fitness_values"]):
             solution_tuple = tuple(opt)  # Ensure the solution is a tuple
             if solution_tuple not in node_mapping:
                 node_label = f"Local Optimum {len(node_mapping) + 1}"
                 node_mapping[solution_tuple] = node_label
                 G.add_node(node_label, solution=opt, fitness=fitness)
+
+                # noise cloud
+                for i in range(10):
+                    from FitnessFunctions import eval_noisy_kp_v1
+                    from ProblemScripts import load_problem_KP
+                    n_items, capacity, optimal, values, weights, items_dict, problem_info = load_problem_KP('f1_l-d_kp_10_269')
+                    noisy_node_label = f"Noisy {node_label} {i+1}"
+                    # Compute the noisy fitness using your provided noisy fitness function.
+                    # Ensure that eval_noisy_kp_v1 is imported/defined and that items_dict and capacity are available.
+                    noisy_fitness = eval_noisy_kp_v1(opt, items_dict=items_dict, capacity=capacity, noise_intensity=1)[0]
+                    # Add the noisy node with a 'pink' color attribute.
+                    noisy_node_size = 15 
+                    G.add_node(noisy_node_label, solution=opt, fitness=noisy_fitness, color='pink', size=noisy_node_size)
+                    # Optionally, add an edge from the LON node to this noisy node.
+                    G.add_edge(node_label, noisy_node_label, weight=STN_edge_size_slider, color='pink', style='dotted')
 
         # Add edges to the graph directly from the `edges` dictionary
         for (source, target), weight in local_optima["edges"].items():
@@ -1041,6 +1101,7 @@ def update_plot(options, run_options, layout_value, hover_info_value, all_trajec
                 # Add the edge with the weight from the 
                 normalized_weight = weight / max_weight
                 size = normalized_weight * LON_edge_size_slider
+                # size = normalized_weight
                 G.add_edge(source_label, target_label, weight=size, color='black')
 
     # Find overall best solution from local optima
@@ -1082,6 +1143,8 @@ def update_plot(options, run_options, layout_value, hover_info_value, all_trajec
             node_colors.append(convert_to_rgba('yellow'))
         elif node in end_nodes:
             node_colors.append(convert_to_rgba('grey'))
+        elif "Noisy" in node:
+            node_colors.append(convert_to_rgba('orange', LON_node_opac))
         elif "Local Optimum" in node:
             if local_optima_color:
                 fitness = G.nodes[node]['fitness']
@@ -1168,18 +1231,34 @@ def update_plot(options, run_options, layout_value, hover_info_value, all_trajec
     elif hover_info_value == 'solutions':
         node_hover_text = [str(G.nodes[node]['solution']) for node in G.nodes()]
 
+
+# ---------- PLOTTING -----------
+
     # Prepare Plotly traces
     edge_trace = []
-    for edge in G.edges(data=True):
-        x0, y0 = pos[edge[0]][0], pos[edge[0]][1]
-        x1, y1 = pos[edge[1]][0], pos[edge[1]][1]
-        trace = go.Scatter(
-            x=[x0, x1, None],
-            y=[y0, y1, None],
-            mode='lines',
-            line=dict(width=2, color=edge[2].get('color', 'black')),
-            hoverinfo='none'
-        )
+    for u, v, key, data in G.edges(data=True, keys=True):
+        # print(u, v, key, data)
+        if option_curve_edges == True:
+            start = pos[u][:2]
+            end = pos[v][:2]
+            curve = quadratic_bezier(start, end, curvature=0.2, n_points=20)
+            trace = go.Scatter(
+                x=list(curve[:, 0]) + [None],
+                y=list(curve[:, 1]) + [None],
+                mode='lines',
+                line=dict(width=data.get('weight', 2), color=data.get('color', 'black')),
+                hoverinfo='none'
+            )
+        else:
+            x0, y0 = pos[u][0], pos[u][1]
+            x1, y1 = pos[v][0], pos[v][1]
+            trace = go.Scatter(
+                x=[x0, x1, None],
+                y=[y0, y1, None],
+                mode='lines',
+                line=dict(width=data.get('weight', 2), color=data.get('color', 'black')),
+                hoverinfo='none'
+            )
         edge_trace.append(trace)
 
     # Set x and y axis ranges based on slider
@@ -1199,18 +1278,34 @@ def update_plot(options, run_options, layout_value, hover_info_value, all_trajec
     if plot_3D:
         # 3D Plotting logic
         fig = go.Figure()
-        for edge in G.edges(data=True):
-            x0, y0, z0 = pos[edge[0]][0], pos[edge[0]][1], G.nodes[edge[0]]['fitness']
-            x1, y1, z1 = pos[edge[1]][0], pos[edge[1]][1], G.nodes[edge[1]]['fitness']
-            weight = edge[2]['weight']  # Access the edge weight
-            trace = go.Scatter3d(
-                x=[x0, x1],
-                y=[y0, y1],
-                z=[z0, z1],
-                mode='lines',
-                line=dict(width=weight * 1, color=convert_to_rgba(edge[2].get('color', 'black'), STN_edge_opac)),
-                hoverinfo='none'
-            )
+        for u, v, key, data in G.edges(data=True, keys=True):
+            if option_curve_edges == True:
+                start = pos[u][:2]
+                end = pos[v][:2]
+                curve = quadratic_bezier(start, end, curvature=0.2, n_points=20)
+                z0 = G.nodes[u]['fitness']
+                z1 = G.nodes[v]['fitness']
+                z_values = np.linspace(z0, z1, len(curve))
+                trace = go.Scatter3d(
+                    x=list(curve[:, 0]),
+                    y=list(curve[:, 1]),
+                    z=list(z_values),
+                    mode='lines',
+                    line=dict(width=data.get('weight', 2), color=convert_to_rgba(data.get('color', 'black'), STN_edge_opac)),
+                    hoverinfo='none'
+                )
+            else:
+                x0, y0, z0 = pos[u][0], pos[u][1], G.nodes[u]['fitness']
+                x1, y1, z1 = pos[v][0], pos[v][1], G.nodes[v]['fitness']
+                weight = data.get('weight', 2)
+                trace = go.Scatter3d(
+                    x=[x0, x1],
+                    y=[y0, y1],
+                    z=[z0, z1],
+                    mode='lines',
+                    line=dict(width=weight, color=convert_to_rgba(data.get('color', 'black'), STN_edge_opac)),
+                    hoverinfo='none'
+                )
             fig.add_trace(trace)
 
         node_trace_3d = go.Scatter3d(

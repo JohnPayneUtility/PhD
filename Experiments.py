@@ -3,15 +3,16 @@ from ProblemScripts import load_problem_KP
 from ExperimentsHelpers import *
 from LONs import *
 from FitnessFunctions import *
+import numpy as np
 
 # ==============================
 # Experiment Settings
 # ==============================
 basis_experiment = AlgosVariable
-eval_limit = 10000
+eval_limit = 100000
 runs = 10
 selected_problems = [
-        'onemax',
+        # 'onemax',
         'knapsack',
         # 'rastrigin',
     ]
@@ -20,6 +21,11 @@ eval_limits = [38392, 38392, 41066, 44477, 50728, 56851, 64079, 70736, 79034, 86
 
 noise_values = [0, 3, 6, 9]
 eval_limits = [38392, 44477, 64079, 86078]
+# eval_limits = [eval_limit for _ in noise_values]
+
+
+create_STNs = False
+create_LONs = True
 
 
 # ==============================
@@ -27,11 +33,11 @@ eval_limits = [38392, 44477, 64079, 86078]
 # ==============================
 rastrigin_dims = [2, 3]
 kp_problems = [
-    ('f10_l-d_kp_20_879', 1025),
+    # ('f10_l-d_kp_20_879', 1025),
     ('f1_l-d_kp_10_269', 295),
     # ('f2_l-d_kp_20_878', 1024),
-    # ('f3_l-d_kp_4_20', 35),
-    ('f4_l-d_kp_4_11', 23),
+    ('f3_l-d_kp_4_20', 35),
+    # ('f4_l-d_kp_4_11', 23),
     # ('f5_l-d_kp_15_375', 481.0694),
     # ('f6_l-d_kp_10_60', 52),
     # ('f7_l-d_kp_7_50', 107),
@@ -69,6 +75,8 @@ if __name__ == '__main__':
             'goal': 'Maximization',
             'dimensions': 100,
             'opt_global': 100,
+            'mean_value': 1,
+            'mean_weight': 1,
             'PID': 'OneMax_100' 
         }
         base_params = {
@@ -81,8 +89,20 @@ if __name__ == '__main__':
             'gen_limit': None
         }
         fitness_functions = [(OneMax_fitness, {})]
-        basis_experiment(prob_info, base_params, fitness_functions, noise_values, runs, eval_limits = eval_limits)
-    
+        if create_STNs == True:
+            basis_experiment(prob_info, base_params, fitness_functions, noise_values, runs, eval_limits = eval_limits)
+        LON_fit_func = (OneMax_fitness, {})
+        # LON_fit_func = (OneMax_fitness, {'noise_intensity': 3})
+        if create_LONs == True:
+            create_binary_LON(prob_info,
+                    base_params,
+                    n_flips_mut = 1,
+                    n_flips_pert = 2,
+                    pert_attempts = 1500,
+                    fitness_function = LON_fit_func,
+                    n_runs = 100,
+                    compression_accs = ['None', 0, 1, 2, 5, 10])
+                
     # ---------- KNAPSACK ----------
     if 'knapsack' in selected_problems:
         for (filename, opt) in kp_problems:
@@ -95,6 +115,8 @@ if __name__ == '__main__':
                 'goal': 'Maximization',
                 'dimensions': n_items,
                 'opt_global': optimal,
+                'mean_value': np.mean(values),
+                'mean_weight': np.mean(weights),
                 'PID':  filename
             }
             base_params = {
@@ -108,20 +130,24 @@ if __name__ == '__main__':
             }
             fitness_functions = [
                 (eval_noisy_kp_v1, {'items_dict': items_dict, 'capacity': capacity}),
-                (eval_noisy_kp_v2, {'items_dict': items_dict, 'capacity': capacity}),
+                # (eval_noisy_kp_v2, {'items_dict': items_dict, 'capacity': capacity}),
                 ]
             # Create STNs
-            basis_experiment(prob_info, base_params, fitness_functions, noise_values, runs, eval_limits = eval_limits)
+            if create_STNs == True:
+                basis_experiment(prob_info, base_params, fitness_functions, noise_values, runs, eval_limits = eval_limits)
             # Create LONs
             LON_fit_func = (eval_ind_kp, {'items_dict': items_dict, 'capacity': capacity, 'penalty': 1})
-            # create_binary_LON(prob_info,
-            #           base_params,
-            #           n_flips_mut = 1,
-            #           n_flips_pert = 2,
-            #           pert_attempts = 1500,
-            #           fitness_function = LON_fit_func,
-            #           n_runs = 100,
-            #           compression_accs = [0, 1, 2, 5, 10])
+            # LON_fit_func = (eval_noisy_kp_v1, {'items_dict': items_dict, 'capacity': capacity, 'penalty': 1, 'noise_intensity': 3})
+            if create_LONs == True:
+                create_binary_LON(prob_info,
+                        base_params,
+                        n_flips_mut = 1,
+                        n_flips_pert = 2,
+                        pert_attempts = 1500,
+                        fitness_function = LON_fit_func,
+                        n_runs = 500,
+                        # compression_accs = ['None'])
+                        compression_accs = ['None', 0, 1, 2, 5, 10])
     # ---------- Rastrigin ----------
     if 'rastrigin' in selected_problems:
         for dim in rastrigin_dims:

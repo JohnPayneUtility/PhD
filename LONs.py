@@ -98,6 +98,8 @@ def BinaryLON(pert_attempts, len_sol, weights,
     local_optima = []
     fitness_values = []
     edges = {}
+    prev_local_opt = None
+    prev_fitness = None
 
     # 6) Run basin-hopping
     mut_attempts = 15000
@@ -114,50 +116,54 @@ def BinaryLON(pert_attempts, len_sol, weights,
                 for mutant in mutants:
                     del mutant.fitness.values
                     mutant.fitness.values = toolbox.evaluate(mutant)
-
+                
                 # Get the best mutant from among all neighbors + current solution
                 best_mutant = tools.selBest(mutants + [individual], 1)[0]
                 
                 # Check if best_mutant is strictly better than the current individual
                 if best_mutant.fitness > individual.fitness:
-                    # Track edges or LON transitions
-                    if len(local_optima) > 0:
-                        if tuple(individual) not in local_optima:
-                            local_optima.append(tuple(individual))
-                            fitness_values.append(individual.fitness.values[0])
-
-                        if tuple(best_mutant) not in local_optima:
-                            local_optima.append(tuple(best_mutant))
-                            fitness_values.append(best_mutant.fitness.values[0])
-
-                        edges[(tuple(individual), tuple(best_mutant))] = \
-                            edges.get((tuple(individual), tuple(best_mutant)), 0) + 1
-
                     # Move to new best solution
                     individual[:] = best_mutant
                     del individual.fitness.values
                     individual.fitness.values = toolbox.evaluate(individual)
-                    if tuple(individual) not in local_optima:
-                        local_optima.append(tuple(individual))
-                        fitness_values.append(individual.fitness.values[0])
                 else:
-                    # No strictly better neighbor found => local optimum
+                    # No strictly better neighbor found => we are at a local optimum
                     improvement = False
+            
+            current_local_opt = tuple(individual)
+            current_fitness = individual.fitness.values[0]
 
-            # Perturbation
+            if prev_fitness is not None and current_fitness < prev_fitness:
+                print("Alert: Non-monotonic transition detected. Previous fitness:", prev_fitness, "Current fitness:", current_fitness)
+            
+            # Now, after local search, record the local optimum
+            current_local_opt = tuple(individual)
+            if current_local_opt not in local_optima:
+                local_optima.append(current_local_opt)
+                fitness_values.append(individual.fitness.values[0])
+            
+            # Record an edge from the previous local optimum to the current one
+            if prev_local_opt is not None and prev_local_opt != current_local_opt:
+                edges[(prev_local_opt, current_local_opt)] = edges.get((prev_local_opt, current_local_opt), 0) + 1
+            
+            # Update the previous optimum for the next iteration
+            prev_local_opt = current_local_opt
+            prev_fitness = current_fitness
+            
+            # Perturbation step: try to escape the basin of attraction
             pert_attempt += 1
             perturbed = toolbox.clone(individual)
             perturbed[:], _ = random_bit_flip(perturbed, n_flips=n_flips_pert, exclude_indices=None)
             del perturbed.fitness.values
             perturbed.fitness.values = toolbox.evaluate(perturbed)
-
-            # If the perturbed solution is better, switch to it and reset attempts
+            
+            # If the perturbed solution is better, switch to it and reset the perturbation counter
             if perturbed.fitness > individual.fitness:
                 individual[:] = perturbed
                 pert_attempt = 0
 
         elif improv_method == 'first':
-            # Impleement first improvement
+            # Implement first improvement if needed
             pass
 
     # 7) Convert edges dict to a list
@@ -310,8 +316,11 @@ def create_binary_LON(prob_info,
     # aggregated_lon_data_SE = convert_to_split_edges_format(aggregated_lon_data)
     # compressed_lon_data_SE = convert_to_split_edges_format(compressed_lon_data)
     for comp_acc in compression_accs:
-        compressed_lon_data = compress_lon_aggregated(aggregated_lon_data, accuracy=comp_acc)
-        LON_data = compressed_lon_data
+        if comp_acc == 'None':
+            LON_data = aggregated_lon_data
+        else:
+            compressed_lon_data = compress_lon_aggregated(aggregated_lon_data, accuracy=comp_acc)
+            LON_data = compressed_lon_data
 
         LON_results = {
             "problem_name": prob_info['name'],
