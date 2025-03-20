@@ -1,6 +1,7 @@
 # IMPORTS
 import numpy as np
 import random
+from LONs import random_bit_flip
 
 # ==============================
 
@@ -30,6 +31,42 @@ def eval_ind_kp(individual, items_dict, capacity, penalty=1):
     
     # Check if over capacity and return reduced value
     if weight > capacity:
+        if penalty == 1:
+            value_with_penalty = capacity - weight
+            return (value_with_penalty,)
+        else:
+            return (0,)
+    return (value,) # Not over capacity return value
+
+def eval_noisy_kp_v1_simple(individual, items_dict, capacity, noise_intensity=0, penalty=1):
+    """ Function calculates fitness for knapsack problem individual """
+    n_items = len(individual)
+    weight = sum(items_dict[i][1] * individual[i] for i in range(n_items)) # Calc solution weight
+    value = sum(items_dict[i][0] * individual[i] for i in range(n_items)) # Calc solution value
+    
+    noise = random.gauss(0, noise_intensity)
+    value = value + noise
+
+    # Check if over capacity and return reduced value
+    if weight > capacity:
+        if penalty == 1:
+            value_with_penalty = capacity - weight
+            return (value_with_penalty,)
+        else:
+            return (0,)
+    return (value,) # Not over capacity return value
+
+def eval_noisy_kp_v2_simple(individual, items_dict, capacity, noise_intensity=0, penalty=1):
+    """ Function calculates fitness for knapsack problem individual """
+    n_items = len(individual)
+    weight = sum(items_dict[i][1] * individual[i] for i in range(n_items)) # Calc solution weight
+    value = sum(items_dict[i][0] * individual[i] for i in range(n_items)) # Calc solution value
+    
+    noise = random.gauss(0, noise_intensity)
+    value = value + noise
+
+    # Check if over capacity and return reduced value
+    if (weight + noise) > capacity:
         if penalty == 1:
             value_with_penalty = capacity - weight
             return (value_with_penalty,)
@@ -72,6 +109,25 @@ def eval_noisy_kp_v2(individual, items_dict, capacity, noise_intensity=0, penalt
         else:
             return (0,)
     return (value,) # Not over capacity return value
+
+def eval_noisy_kp_prior(individual, items_dict, capacity, noise_intensity=0, penalty=1, return_sol=False):
+    """ Function calculates fitness for knapsack problem individual """
+    n_items = len(individual)
+    noisy_individual = random_bit_flip(individual, n_flips=noise_intensity)
+    weight = sum(items_dict[i][1] * noisy_individual[i] for i in range(n_items)) # Calc solution weight
+    value = sum(items_dict[i][0] * noisy_individual[i] for i in range(n_items)) # Calc solution value
+
+    # Check if over capacity and return reduced value
+    if weight > capacity:
+        if penalty == 1:
+            value_with_penalty = capacity - weight
+            if return_sol: return (value_with_penalty,), noisy_individual
+            else: return (value_with_penalty,)
+        else:
+            if return_sol: return (0,), noisy_individual
+            else: return (0,)
+    if return_sol: return (value,), noisy_individual
+    else: return (value,)
 
 # ==============================
 # Continuous Fitness Functions

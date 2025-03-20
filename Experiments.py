@@ -5,27 +5,37 @@ from LONs import *
 from FitnessFunctions import *
 import numpy as np
 
+import logging
+for handler in logging.root.handlers[:]:
+    logging.root.removeHandler(handler)
+logging.basicConfig(
+    level=logging.INFO,
+    filename='my_log.log',  # writes messages to a file
+    filemode='w',           # 'w' to overwrite, 'a' to append
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
+
 # ==============================
 # Experiment Settings
 # ==============================
 basis_experiment = AlgosVariable
 eval_limit = 100000
-runs = 10
+runs = 30
 selected_problems = [
-        # 'onemax',
-        'knapsack',
+        'onemax',
+        # 'knapsack',
         # 'rastrigin',
     ]
 noise_values = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 eval_limits = [38392, 38392, 41066, 44477, 50728, 56851, 64079, 70736, 79034, 86078, 93638]
 
-noise_values = [0, 3, 6, 9]
-eval_limits = [38392, 44477, 64079, 86078]
+# noise_values = [0, 3, 6, 9]
+# eval_limits = [38392, 44477, 64079, 86078]
 # eval_limits = [eval_limit for _ in noise_values]
 
 
-create_STNs = False
-create_LONs = True
+create_STNs = True
+create_LONs = False
 
 
 # ==============================
@@ -34,10 +44,10 @@ create_LONs = True
 rastrigin_dims = [2, 3]
 kp_problems = [
     # ('f10_l-d_kp_20_879', 1025),
-    ('f1_l-d_kp_10_269', 295),
+    # ('f1_l-d_kp_10_269', 295),
     # ('f2_l-d_kp_20_878', 1024),
-    ('f3_l-d_kp_4_20', 35),
-    # ('f4_l-d_kp_4_11', 23),
+    # ('f3_l-d_kp_4_20', 35),
+    # ('f4_l-d_kp_4_11', 23), # potentially problematic
     # ('f5_l-d_kp_15_375', 481.0694),
     # ('f6_l-d_kp_10_60', 52),
     # ('f7_l-d_kp_7_50', 107),
@@ -145,7 +155,7 @@ if __name__ == '__main__':
                         n_flips_pert = 2,
                         pert_attempts = 1500,
                         fitness_function = LON_fit_func,
-                        n_runs = 500,
+                        n_runs = 100,
                         # compression_accs = ['None'])
                         compression_accs = ['None', 0, 1, 2, 5, 10])
     # ---------- Rastrigin ----------

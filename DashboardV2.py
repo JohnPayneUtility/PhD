@@ -1075,15 +1075,15 @@ def update_plot(options, run_options, layout_value, hover_info_value, all_trajec
 
                 # noise cloud
                 for i in range(10):
-                    from FitnessFunctions import eval_noisy_kp_v1
+                    from FitnessFunctions import eval_noisy_kp_prior
                     from ProblemScripts import load_problem_KP
-                    n_items, capacity, optimal, values, weights, items_dict, problem_info = load_problem_KP('f1_l-d_kp_10_269')
+                    n_items, capacity, optimal, values, weights, items_dict, problem_info = load_problem_KP('f7_l-d_kp_7_50')
                     noisy_node_label = f"Noisy {node_label} {i+1}"
                     # Compute the noisy fitness using your provided noisy fitness function.
                     # Ensure that eval_noisy_kp_v1 is imported/defined and that items_dict and capacity are available.
-                    noisy_fitness = eval_noisy_kp_v1(opt, items_dict=items_dict, capacity=capacity, noise_intensity=1)[0]
+                    noisy_fitness = eval_noisy_kp_prior(opt, items_dict=items_dict, capacity=capacity, noise_intensity=1)[0]
                     # Add the noisy node with a 'pink' color attribute.
-                    noisy_node_size = 15 
+                    noisy_node_size = 14 
                     G.add_node(noisy_node_label, solution=opt, fitness=noisy_fitness, color='pink', size=noisy_node_size)
                     # Optionally, add an edge from the LON node to this noisy node.
                     G.add_edge(node_label, noisy_node_label, weight=STN_edge_size_slider, color='pink', style='dotted')
@@ -1250,13 +1250,15 @@ def update_plot(options, run_options, layout_value, hover_info_value, all_trajec
                 hoverinfo='none'
             )
         else:
+            # norm_weight = data.get('weight', 0.5)
+            # color = px.colors.sample_colorscale('Viridis', norm_weight)[0]
             x0, y0 = pos[u][0], pos[u][1]
             x1, y1 = pos[v][0], pos[v][1]
             trace = go.Scatter(
                 x=[x0, x1, None],
                 y=[y0, y1, None],
                 mode='lines',
-                line=dict(width=data.get('weight', 2), color=data.get('color', 'black')),
+                line=dict(width=2, color='black'),
                 hoverinfo='none'
             )
         edge_trace.append(trace)

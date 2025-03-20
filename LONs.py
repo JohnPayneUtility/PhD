@@ -10,6 +10,9 @@ from ExperimentsHelpers import *
 
 from tqdm import trange
 
+import logging
+logger = logging.getLogger(__name__)
+
 # ----------------------------------------------------
 # Custom Mutation Functions
 # ----------------------------------------------------
@@ -156,11 +159,19 @@ def BinaryLON(pert_attempts, len_sol, weights,
             perturbed[:], _ = random_bit_flip(perturbed, n_flips=n_flips_pert, exclude_indices=None)
             del perturbed.fitness.values
             perturbed.fitness.values = toolbox.evaluate(perturbed)
+            if pert_attempt % 100 == 0:
+                logging.info(f"PertAttmpt: {pert_attempt}")
             
             # If the perturbed solution is better, switch to it and reset the perturbation counter
-            if perturbed.fitness > individual.fitness:
+            tolerance = 1e-6
+            if perturbed.fitness.values[0] > individual.fitness.values[0] + tolerance:
                 individual[:] = perturbed
+                del individual.fitness.values
+                individual.fitness.values = toolbox.evaluate(individual)
                 pert_attempt = 0
+                logging.info(f"Current fitness: {individual.fitness.values[0]:.6f}, Perturbed: {perturbed.fitness.values[0]:.6f}")
+                logging.info(f"resetting PertAttmpts: {pert_attempt}")
+                
 
         elif improv_method == 'first':
             # Implement first improvement if needed
