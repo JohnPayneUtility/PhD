@@ -669,7 +669,8 @@ def render_content_2DPlot_tab(tab):
         ])
     elif tab == 'p2':
         return html.Div([
-            dcc.Graph(id='2DBoxPlot'),
+            # dcc.Graph(id='2DBoxPlot'),
+            dcc.Graph(id='2DBoxPlot', style={'width': '800px', 'height': '600px'}),
         ])
     elif tab == 'p3':
         return html.Div([

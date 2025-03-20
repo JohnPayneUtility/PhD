@@ -69,12 +69,15 @@ def plot2d_box(dataframe, value='final'):
         y="final_fit",
         color="algo_name",
         category_orders={"noise": noise_levels},
-        points="all"  # optionally, to display all data points
+        # points="all"
+        points=False
     )
 
     fig.update_layout(
+        title="Algorithm Performance on 100 Item OneMax",
         boxmode="group",  # groups boxes for the same noise level
-        xaxis_title="Noise",
+        # xaxis_title="$\\sigma$ (Standard Deviation of Gaussian Noise $N(0,\\sigma)$)",
+        xaxis_title="Standard Deviation of Noise",
         yaxis_title="Best solution found",
         legend_title="Algorithm",
         template="plotly_white"

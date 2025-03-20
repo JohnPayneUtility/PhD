@@ -29,6 +29,9 @@ selected_problems = [
 noise_values = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 eval_limits = [38392, 38392, 41066, 44477, 50728, 56851, 64079, 70736, 79034, 86078, 93638]
 
+noise_values = [0, 1, 2, 3, 4, 5]
+eval_limits = [38392, 38392, 41066, 44477, 50728, 56851]
+
 # noise_values = [0, 3, 6, 9]
 # eval_limits = [38392, 44477, 64079, 86078]
 # eval_limits = [eval_limit for _ in noise_values]

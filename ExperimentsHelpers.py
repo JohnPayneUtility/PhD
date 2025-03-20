@@ -30,18 +30,22 @@ def dynamic_pop_size_UMDA(n_items, noise):
 def dynamic_pop_size_PCEA(n_items, noise):
     return int(10 * np.sqrt(n_items) * np.log(n_items))
 
+def dynamic_pop_size_mu(n_items, noise):
+    return int(max(noise * noise, 1) * np.log(n_items))
+
 def inverse_n_mut_rate(n_items, noise):
     return {'indpb': 1/n_items}
+
 
 # ===============================
 
 def AlgosVariable(prob_info, base_params, fitness_functions, noise_values, runs, eval_limits = None):
-    algorithm_classes = [MuPlusLamdaEA, UMDA, PCEA]
+    algorithm_classes = [MuPlusLamdaEA]
     extra_params_by_algo = {
         'MuPlusLamdaEA': [
             # {'mu': 1, 'lam': 1, 'mutate_function': tools.mutFlipBit, 'mutate_params': {'indpb': 1/100}},
-            {'mu': 1, 'lam': 1, 'mutate_function': tools.mutFlipBit, 'mutate_params': inverse_n_mut_rate},
-            # {'mu': dynamic_pop_size_PCEA, 'lam': 1, 'mutate_function': tools.mutFlipBit, 'mutate_params': inverse_n_mut_rate},
+            # {'mu': 1, 'lam': 1, 'mutate_function': tools.mutFlipBit, 'mutate_params': inverse_n_mut_rate},
+            {'mu': dynamic_pop_size_mu, 'lam': 1, 'mutate_function': tools.mutFlipBit, 'mutate_params': inverse_n_mut_rate},
         ],
         'UMDA': [
             {'pop_size': dynamic_pop_size_UMDA},
@@ -59,7 +63,7 @@ def AlgosVariable(prob_info, base_params, fitness_functions, noise_values, runs,
                                 eval_limits,
                                 num_runs=runs,
                                 base_seed=0,
-                                parallel=True)
+                                parallel=False)
     pd.set_option('display.max_columns', None)
     # print(results_df.head(20))
     save_or_append_results(results_df)
