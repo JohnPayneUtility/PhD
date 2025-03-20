@@ -41,7 +41,7 @@ def AlgosVariable(prob_info, base_params, fitness_functions, noise_values, runs,
         'MuPlusLamdaEA': [
             # {'mu': 1, 'lam': 1, 'mutate_function': tools.mutFlipBit, 'mutate_params': {'indpb': 1/100}},
             {'mu': 1, 'lam': 1, 'mutate_function': tools.mutFlipBit, 'mutate_params': inverse_n_mut_rate},
-            {'mu': dynamic_pop_size_PCEA, 'lam': 1, 'mutate_function': tools.mutFlipBit, 'mutate_params': inverse_n_mut_rate},
+            # {'mu': dynamic_pop_size_PCEA, 'lam': 1, 'mutate_function': tools.mutFlipBit, 'mutate_params': inverse_n_mut_rate},
         ],
         'UMDA': [
             {'pop_size': dynamic_pop_size_UMDA},
