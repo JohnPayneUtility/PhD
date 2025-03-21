@@ -279,6 +279,17 @@ app.layout = html.Div([
         value=['plot_3D', 'LON_node_strength']  # Set default values
     ),
     dcc.Dropdown(
+        id='plotType',
+        options=[
+            {'label': 'RegLon', 'value': 'RegLon'},
+            {'label': 'NLon_box', 'value': 'NLon_box'},
+            {'label': 'STN', 'value': 'STN'},
+        ],
+        value='NLon_box',
+        placeholder='Select plot type',
+        style={'width': '50%', 'marginTop': '10px'}
+    ),
+    dcc.Dropdown(
         id='layout',
         options=[
             {'label': 'Fruchterman Reignold force directed', 'value': 'spring'},
@@ -301,6 +312,24 @@ app.layout = html.Div([
         value='fitness',
         placeholder='Select hover information',
         style={'width': '50%', 'marginTop': '10px'}
+    ),
+    dcc.Input(
+        id='azimuth_deg',
+        type='number',
+        value=35,       # initial value
+        min=0,
+        max=180,
+        step=1,
+        style={'width': '100px'}
+    ),
+    dcc.Input(
+        id='elevation_deg',
+        type='number',
+        value=60,       # initial value
+        min=0,
+        max=90,
+        step=1,
+        style={'width': '100px'}
     ),
     dcc.Checklist(
         id='use-range-sliders',
@@ -848,7 +877,10 @@ def update_table2_selected(series_list):
      Input('options', 'value'),
      Input('run-options', 'value'),
      Input('layout', 'value'),
+     Input('plotType', 'value'),
      Input('hover-info', 'value'),
+     Input('azimuth_deg', 'value'),
+     Input('elevation_deg', 'value'),
      Input('STN_data_processed', 'data'),
      Input('run-selector', 'value'),
      Input('LON_data', 'data'),
@@ -864,7 +896,7 @@ def update_table2_selected(series_list):
      Input('STN-edge-opacity-slider', 'value'),
      Input('noisy_fitnesses_data', 'data')]
 )
-def update_plot(optimum, PID, options, run_options, layout_value, hover_info_value, all_trajectories_list, n_runs_display, local_optima, use_range_slider, x_slider, y_slider, node_size_slider, LON_edge_size_slider, STN_edge_size_slider, LON_node_opac, LON_edge_opac, STN_node_opac, STN_edge_opac, noisy_fitnesses_list):
+def update_plot(optimum, PID, options, run_options, layout_value, plot_type, hover_info_value, azimuth_deg, elevation_deg, all_trajectories_list, n_runs_display, local_optima, use_range_slider, x_slider, y_slider, node_size_slider, LON_edge_size_slider, STN_edge_size_slider, LON_node_opac, LON_edge_opac, STN_node_opac, STN_edge_opac, noisy_fitnesses_list):
     # Options from checkboxes
     show_labels = 'show_labels' in options
     hide_STN_nodes = 'hide_STN_nodes' in options
@@ -889,7 +921,7 @@ def update_plot(optimum, PID, options, run_options, layout_value, hover_info_val
     # Colors for different sets of trajectories
     algo_colors = ['blue', 'orange', 'purple', 'brown', 'cyan', 'magenta']
     node_color_shared = 'green'
-    option_curve_edges = False
+    option_curve_edges = True
 
     # Add nodes and edges for each set of trajectories
     node_mapping = {}  # To ensure unique solutions map to the same node
@@ -935,14 +967,14 @@ def update_plot(optimum, PID, options, run_options, layout_value, hover_info_val
                 print(f"Skipping run {run_idx} due to None values: {entry}")
                 continue
 
-            print(unique_fitnesses)
-            print(noisy_fitnesses)
+            # print(unique_fitnesses)
+            # print(noisy_fitnesses)
             noisy_fitnesses = [int(fit) for fit in noisy_fitnesses]
-            print(noisy_fitnesses)
+            # print(noisy_fitnesses)
             for i, solution in enumerate(unique_solutions):
                 solution_tuple = tuple(solution)
                 if solution_tuple not in node_mapping:
-                    node_label = f"Solution {len(node_mapping) + 1}"
+                    node_label = f"STN {len(node_mapping) + 1}"
                     node_mapping[solution_tuple] = node_label
                     G.add_node(node_label, solution=solution, fitness=unique_fitnesses[i], iterations=solution_iterations[i], run_idx=run_idx, step=i)
                 else:
@@ -951,13 +983,13 @@ def update_plot(optimum, PID, options, run_options, layout_value, hover_info_val
                 # Add noisy fitness node
                 noisy_node_label = f"Noisy {node_label}"
                 if noisy_node_label not in G.nodes:
-                    print(f"Existing nodes: {list(G.nodes())}")
-                    print(f"Adding node: {noisy_node_label} with fitness {noisy_fitnesses[i]}")
+                    # print(f"Existing nodes: {list(G.nodes())}")
+                    # print(f"Adding node: {noisy_node_label} with fitness {noisy_fitnesses[i]}")
                     try:
                         G.add_node(noisy_node_label, solution=solution, fitness=noisy_fitnesses[i])
                     except Exception as e:
-                        print(f"Error adding noisy node: {noisy_node_label}, {e}")
-                    G.add_edge(node_label, noisy_node_label, weight=STN_edge_size_slider, color='gray', style='dotted')
+                        print(f"Error adding noisy node: {noisy_node_label}, {e}") # print error
+                    G.add_edge(node_label, noisy_node_label, weight=STN_edge_size_slider, color='gray', edge_type='Noise')
 
                 # Set start and end nodes for coloring later
                 if i == 0:
@@ -970,7 +1002,7 @@ def update_plot(optimum, PID, options, run_options, layout_value, hover_info_val
                 prev_solution = tuple(prev_solution)
                 current_solution = tuple(current_solution)
                 if prev_solution in node_mapping and current_solution in node_mapping:
-                    G.add_edge(node_mapping[prev_solution], node_mapping[current_solution], weight=STN_edge_size_slider, color=edge_color)
+                    G.add_edge(node_mapping[prev_solution], node_mapping[current_solution], weight=STN_edge_size_slider, color=edge_color, edge_type='STN')
 
     # Add trajectory nodes if provided
     if all_trajectories_list:
@@ -1045,7 +1077,7 @@ def update_plot(optimum, PID, options, run_options, layout_value, hover_info_val
         local_optima = filter_negative_LO(local_optima)
         print(len(local_optima["local_optima"]))
 
-        # ---------- check for duplicate edges ----------
+        # ---------- check for LON duplicate edges ----------
         from collections import Counter
 
         # Suppose raw_edges is a list of tuples, e.g., [(source, target), (source, target), ...]
@@ -1109,12 +1141,14 @@ def update_plot(optimum, PID, options, run_options, layout_value, hover_info_val
                 # Create node noise for box plots
                 node_noise[node_label] = []  # create an empty list for this node's noisy fitness values
                 n_items, capacity, optimal, values, weights, items_dict, problem_info = load_problem_KP(PID)
-                noise_intensity = int(optimum*0.05)
+                # noise_intensity = int(optimum*0.05)
+                noise_intensity = 1
                 for i in range(30):
                     # Compute the noisy fitness (assuming eval_noisy_kp_v1 returns a tuple with the fitness as its first element)
-                    noisy_fitness = eval_noisy_kp_v1_simple(opt, items_dict=items_dict, capacity=capacity, noise_intensity=noise_intensity)[0]
+                    # noisy_fitness = eval_noisy_kp_v1_simple(opt, items_dict=items_dict, capacity=capacity, noise_intensity=noise_intensity)[0]
+                    noisy_fitness = eval_noisy_kp_v2(opt, items_dict=items_dict, capacity=capacity, noise_intensity=noise_intensity)[0]
                     node_noise[node_label].append(noisy_fitness)
-        fitness_dict = {node: data['fitness'] for node, data in G.nodes(data=True) if 'Local Optimum' in node}
+        fitness_dict = {node: data['fitness'] for node, data in G.nodes(data=True)}
 
         # Add edges to the graph directly from the `edges` dictionary
         for (source, target), weight in local_optima["edges"].items():
@@ -1125,7 +1159,7 @@ def update_plot(optimum, PID, options, run_options, layout_value, hover_info_val
             if source_tuple in node_mapping and target_tuple in node_mapping:
                 source_label = node_mapping[source_tuple]
                 target_label = node_mapping[target_tuple]
-                G.add_edge(source_label, target_label, weight=weight, color='black')
+                G.add_edge(source_label, target_label, weight=weight, color='black', edge_type='LON')
         
         # Normalise edge weights for edges between Local Optimum nodes
         LON_edge_weight_all = [data.get('weight', 2) 
@@ -1227,16 +1261,19 @@ def update_plot(optimum, PID, options, run_options, layout_value, hover_info_val
     #         node_sizes = [node_size_slider + G.in_degree(node) * node_size_slider for node in G.nodes()]
 
     # Assign node weights
+    node_size_slider = 1
     for node in G.nodes():
-        node_size_slider = 1
         if "Local Optimum" in node:
-            # For LON nodes, weight is the sum of the incoming edge weights.
+            # For LON nodes: weight is the sum of incoming edge weights.
             incoming_edges = G.in_edges(node, data=True)
             node_weight = sum(edge_data.get('weight', 0) for _, _, edge_data in incoming_edges)
-            node_weight * node_size_slider
+            node_weight = node_weight * node_size_slider
+        elif "STN" in node:
+            # For STN nodes: weight comes from the 'iterations' attribute.
+            node_weight = G.nodes[node].get('iterations', 1) * node_size_slider
         else:
-            # For other nodes, use the in_degree scaled by node_size_slider.
-            node_weight = G.in_degree(node) * node_size_slider
+            # For any other node, assign a default weight of 1.
+            node_weight = 1
         # Set the computed weight as a node property.
         G.nodes[node]['weight'] = node_weight
     
@@ -1244,8 +1281,8 @@ def update_plot(optimum, PID, options, run_options, layout_value, hover_info_val
     for node, data in G.nodes(data=True):
         if data.get('fitness') == optimum:
             data['color'] = 'red'
-        else:
-            data['color'] = 'black'
+        # else:
+        #     data['color'] = 'black'
 
 
     # Prepare node positions based on selected layout
@@ -1342,7 +1379,7 @@ def update_plot(optimum, PID, options, run_options, layout_value, hover_info_val
             x_range = [-10, 10]  # Default
             y_range = [-10, 10]  # Default
 
-    if plot_3D:
+    if plot_type == 'RegLon' or plot_type == 'NLon_box':
         # Compute a dynamic H based on the fitness range of local optimum nodes
         local_optimum_nodes = [node for node in G.nodes() if 'Local Optimum' in node]
         if local_optimum_nodes:
@@ -1352,7 +1389,7 @@ def update_plot(optimum, PID, options, run_options, layout_value, hover_info_val
             fitness_range = 1
         # For example, let H be 10% of the overall fitness range; adjust as needed.
         H = fitness_range * 1  
-        dx = 0.1  # horizontal offset for the mini boxplot
+        dx = 0.05  # horizontal offset for the mini boxplot
 
         traces = []
 
@@ -1360,21 +1397,38 @@ def update_plot(optimum, PID, options, run_options, layout_value, hover_info_val
         edge_traces = []
         for u, v, key, data in G.edges(data=True, keys=True):
             # Use only the first two coordinates for x, y from pos; get z from the node's fitness.
-            x0, y0 = pos[u][:2]
-            z0 = G.nodes[u]['fitness']
-            x1, y1 = pos[v][:2]
-            z1 = G.nodes[v]['fitness']
-            weight = data.get('weight', 2)
-            edge_trace = go.Scatter3d(
-                x=[x0, x1],
-                y=[y0, y1],
-                z=[z0, z1],
-                mode='lines',
-                line=dict(width=data.get('norm_weight', 2)*10, color=data.get('color', 'red')),
-                opacity=1,
-                hoverinfo='none',
-                showlegend=False
-            )
+            if option_curve_edges == True and "STN" in data.get("edge_type", ""):
+                print(data.get("edge_type", ""))
+                start = pos[u][:2]
+                end = pos[v][:2]
+                curve = quadratic_bezier(start, end, curvature=0.2, n_points=20)
+                z0 = G.nodes[u]['fitness']
+                z1 = G.nodes[v]['fitness']
+                z_values = np.linspace(z0, z1, len(curve))
+                trace = go.Scatter3d(
+                    x=list(curve[:, 0]),
+                    y=list(curve[:, 1]),
+                    z=list(z_values),
+                    mode='lines',
+                    line=dict(width=10, color=data.get('color', 'green')),
+                    hoverinfo='none'
+                )
+            else:
+                x0, y0 = pos[u][:2]
+                z0 = G.nodes[u]['fitness']
+                x1, y1 = pos[v][:2]
+                z1 = G.nodes[v]['fitness']
+                weight = data.get('weight', 2)
+                edge_trace = go.Scatter3d(
+                    x=[x0, x1],
+                    y=[y0, y1],
+                    z=[z0, z1],
+                    mode='lines',
+                    line=dict(width=data.get('norm_weight', 0.5)*10, color=data.get('color', 'red')),
+                    opacity=1,
+                    hoverinfo='none',
+                    showlegend=False
+                )
             edge_traces.append(edge_trace)
         traces.extend(edge_traces)
 
@@ -1392,7 +1446,7 @@ def update_plot(optimum, PID, options, run_options, layout_value, hover_info_val
             
             # Get node weight and color from the node's attributes:
             node_sizes.append(5+attr.get('weight', 2)*0.2)
-            node_colors.append(attr.get('color', 'black'))
+            node_colors.append(attr.get('color', 'blue'))
 
         node_trace = go.Scatter3d(
             x=node_x,
@@ -1410,126 +1464,222 @@ def update_plot(optimum, PID, options, run_options, layout_value, hover_info_val
 
         # ----- Add mini boxplots for each node using the noise data -----
         # (Only add for nodes that have noise data in node_noise.)
-        for node in pos:
-            if node in fitness_dict and node in node_noise:
-                x, y = pos[node][:2]
-                base_z = fitness_dict[node]
-                noise = np.array(node_noise[node])
-                
-                # Compute quartiles and extremes for the noisy fitness values
-                min_val = np.min(noise)
-                q1 = np.percentile(noise, 25)
-                med = np.median(noise)
-                q3 = np.percentile(noise, 75)
-                max_val = np.max(noise)
-                
-                # Map the noise values linearly to a local z range around the node's base fitness.
-                if max_val == min_val:
-                    z_min = z_q1 = z_med = z_q3 = z_max = base_z
-                else:
-                    # Scaled boxes
-                    # z_min = base_z - H/2
-                    # z_max = base_z + H/2
-                    # z_q1 = base_z - H/2 + (q1 - min_val) / (max_val - min_val) * H
-                    # z_med = base_z - H/2 + (med - min_val) / (max_val - min_val) * H
-                    # z_q3 = base_z - H/2 + (q3 - min_val) / (max_val - min_val) * H
-                    # unscaled boxes
-                    z_min = min_val
-                    z_q1  = q1
-                    z_med = med
-                    z_q3  = q3
-                    z_max = max_val
-                
-                # Offset the boxplot in x so it doesn't overlap the node marker.
-                # x_box = x + dx
-                x_box = x
-                
-                # Create traces for each component of the boxplot:
-                trace_whisker_top = go.Scatter3d(
-                    x=[x_box, x_box],
-                    y=[y, y],
-                    z=[z_q3, z_max],
-                    mode='lines',
-                    line=dict(color='grey', width=2),
-                    showlegend=False
-                )
-                trace_whisker_bottom = go.Scatter3d(
-                    x=[x_box, x_box],
-                    y=[y, y],
-                    z=[z_q1, z_min],
-                    mode='lines',
-                    line=dict(color='grey', width=2),
-                    showlegend=False
-                )
-                trace_cap_top = go.Scatter3d(
-                    x=[x_box - dx/2, x_box + dx/2],
-                    y=[y, y],
-                    z=[z_max, z_max],
-                    mode='lines',
-                    line=dict(color='grey', width=2),
-                    showlegend=False
-                )
-                trace_cap_bottom = go.Scatter3d(
-                    x=[x_box - dx/2, x_box + dx/2],
-                    y=[y, y],
-                    z=[z_min, z_min],
-                    mode='lines',
-                    line=dict(color='grey', width=2),
-                    showlegend=False
-                )
-                # trace_box_left = go.Scatter3d(
-                #     x=[x_box - dx, x_box - dx],
-                #     y=[y, y],
-                #     z=[z_q1, z_q3],
-                #     mode='lines',
-                #     line=dict(color='black', width=4),
-                #     showlegend=False
-                # )
-                # trace_box_right = go.Scatter3d(
-                #     x=[x_box + dx, x_box + dx],
-                #     y=[y, y],
-                #     z=[z_q1, z_q3],
-                #     mode='lines',
-                #     line=dict(color='black', width=4),
-                #     showlegend=False
-                # )
-                trace_box = go.Scatter3d(
-                    x=[x_box, x_box],
-                    y=[y, y],
-                    z=[z_q1, z_q3],
-                    mode='lines',
-                    line=dict(color='black', width=4),
-                    showlegend=False
-                )
-                trace_median = go.Scatter3d(
-                    x=[x_box - dx, x_box + dx],
-                    y=[y, y],
-                    z=[z_med, z_med],
-                    mode='lines',
-                    line=dict(color='red', width=3),
-                    showlegend=False
-                )
-                # traces.extend([trace_whisker_top, trace_whisker_bottom,
-                #             trace_cap_top, trace_cap_bottom,
-                #             trace_box_left, trace_box_right,
-                #             trace_median])
-                traces.extend([trace_whisker_top, trace_whisker_bottom,
-                            trace_cap_top, trace_cap_bottom,
-                            trace_box,
-                            trace_median])
+        if plot_type == 'NLon_box':
+            for node in pos:
+                if node in fitness_dict and node in node_noise:
+                    x, y = pos[node][:2]
+                    base_z = fitness_dict[node]
+                    noise = np.array(node_noise[node])
+                    
+                    # Compute quartiles and extremes for the noisy fitness values
+                    min_val = np.min(noise)
+                    q1 = np.percentile(noise, 25)
+                    med = np.median(noise)
+                    q3 = np.percentile(noise, 75)
+                    max_val = np.max(noise)
+                    
+                    # Map the noise values linearly to a local z range around the node's base fitness.
+                    if max_val == min_val:
+                        z_min = z_q1 = z_med = z_q3 = z_max = base_z
+                    else:
+                        # Scaled boxes
+                        # z_min = base_z - H/2
+                        # z_max = base_z + H/2
+                        # z_q1 = base_z - H/2 + (q1 - min_val) / (max_val - min_val) * H
+                        # z_med = base_z - H/2 + (med - min_val) / (max_val - min_val) * H
+                        # z_q3 = base_z - H/2 + (q3 - min_val) / (max_val - min_val) * H
+                        # unscaled boxes
+                        z_min = min_val
+                        z_q1  = q1
+                        z_med = med
+                        z_q3  = q3
+                        z_max = max_val
+                    
+                    # Offset the boxplot in x so it doesn't overlap the node marker.
+                    # x_box = x + dx
+                    x_box = x
+                    
+                    # Create traces for each component of the boxplot:
+                    trace_whisker_top = go.Scatter3d(
+                        x=[x_box, x_box],
+                        y=[y, y],
+                        z=[z_q3, z_max],
+                        mode='lines',
+                        line=dict(color='grey', width=2),
+                        showlegend=False
+                    )
+                    trace_whisker_bottom = go.Scatter3d(
+                        x=[x_box, x_box],
+                        y=[y, y],
+                        z=[z_q1, z_min],
+                        mode='lines',
+                        line=dict(color='grey', width=2),
+                        showlegend=False
+                    )
+                    trace_cap_top = go.Scatter3d(
+                        x=[x_box - dx/2, x_box + dx/2],
+                        y=[y, y],
+                        z=[z_max, z_max],
+                        mode='lines',
+                        line=dict(color='grey', width=2),
+                        showlegend=False
+                    )
+                    trace_cap_bottom = go.Scatter3d(
+                        x=[x_box - dx/2, x_box + dx/2],
+                        y=[y, y],
+                        z=[z_min, z_min],
+                        mode='lines',
+                        line=dict(color='grey', width=2),
+                        showlegend=False
+                    )
+                    # trace_box_left = go.Scatter3d(
+                    #     x=[x_box - dx, x_box - dx],
+                    #     y=[y, y],
+                    #     z=[z_q1, z_q3],
+                    #     mode='lines',
+                    #     line=dict(color='black', width=4),
+                    #     showlegend=False
+                    # )
+                    # trace_box_right = go.Scatter3d(
+                    #     x=[x_box + dx, x_box + dx],
+                    #     y=[y, y],
+                    #     z=[z_q1, z_q3],
+                    #     mode='lines',
+                    #     line=dict(color='black', width=4),
+                    #     showlegend=False
+                    # )
+                    trace_box = go.Scatter3d(
+                        x=[x_box, x_box],
+                        y=[y, y],
+                        z=[z_q1, z_q3],
+                        mode='lines',
+                        line=dict(color='black', width=4),
+                        showlegend=False
+                    )
+                    trace_medianx = go.Scatter3d(
+                        x=[x_box - dx, x_box + dx],
+                        y=[y, y],
+                        z=[z_med, z_med],
+                        mode='lines',
+                        line=dict(color='red', width=3),
+                        showlegend=False
+                    )
+                    trace_mediany = go.Scatter3d(
+                        x=[x, x],
+                        y=[y - dx, y + dx],
+                        z=[z_med, z_med],
+                        mode='lines',
+                        line=dict(color='red', width=3),
+                        showlegend=False
+                    )
+                    # traces.extend([trace_whisker_top, trace_whisker_bottom,
+                    #             trace_cap_top, trace_cap_bottom,
+                    #             trace_box_left, trace_box_right,
+                    #             trace_median])
+                    traces.extend([trace_whisker_top, trace_whisker_bottom,
+                                trace_cap_top, trace_cap_bottom,
+                                trace_box,
+                                trace_medianx, trace_mediany])
         
         # Build the final figure using the combined traces.
+        # Define desired angles in degrees and convert to radians
+        # azimuth_deg = 35
+        # elevation_deg = 60
+        azimuth = np.deg2rad(azimuth_deg)
+        elevation = np.deg2rad(elevation_deg)
+        r = 2.5
+
+        camera_eye = dict(
+            x = r * np.cos(elevation) * np.cos(azimuth),
+            y = r * np.cos(elevation) * np.sin(azimuth),
+            z = r * np.sin(elevation)
+        )
         fig = go.Figure(data=traces)
         fig.update_layout(
-            scene=dict(
-                xaxis_title='X',
-                yaxis_title='Y',
-                zaxis_title='Fitness'
+        width=1200,
+        height=1200,
+        scene=dict(
+            camera=dict(
+                eye=camera_eye
             ),
-            width=1200,
-            height=1200
+            xaxis=dict(
+                title='X',
+                titlefont=dict(size=24, color='black'),
+                tickfont=dict(size=16, color='black')
+            ),
+            yaxis=dict(
+                title='Y',
+                titlefont=dict(size=24, color='black'),
+                tickfont=dict(size=16, color='black')
+            ),
+            zaxis=dict(
+                title='Fitness',
+                titlefont=dict(size=24, color='black'),  # Larger z-axis label
+                tickfont=dict(size=16, color='black')
+            )
+        ),
+        margin=dict(l=0, r=0, t=0, b=0),
+        template="plotly_white"
         )
+    elif plot_type == 'STN':
+        fig = go.Figure()
+        for u, v, key, data in G.edges(data=True, keys=True):
+            if option_curve_edges == True:
+                start = pos[u][:2]
+                end = pos[v][:2]
+                curve = quadratic_bezier(start, end, curvature=0.2, n_points=20)
+                z0 = G.nodes[u]['fitness']
+                z1 = G.nodes[v]['fitness']
+                z_values = np.linspace(z0, z1, len(curve))
+                trace = go.Scatter3d(
+                    x=list(curve[:, 0]),
+                    y=list(curve[:, 1]),
+                    z=list(z_values),
+                    mode='lines',
+                    line=dict(width=data.get('weight', 2), color=convert_to_rgba(data.get('color', 'black'), STN_edge_opac)),
+                    hoverinfo='none'
+                )
+            else:
+                x0, y0, z0 = pos[u][0], pos[u][1], G.nodes[u]['fitness']
+                x1, y1, z1 = pos[v][0], pos[v][1], G.nodes[v]['fitness']
+                weight = data.get('weight', 2)
+                trace = go.Scatter3d(
+                    x=[x0, x1],
+                    y=[y0, y1],
+                    z=[z0, z1],
+                    mode='lines',
+                    line=dict(width=weight, color=convert_to_rgba(data.get('color', 'black'), STN_edge_opac)),
+                    hoverinfo='none'
+                )
+            fig.add_trace(trace)
 
+        node_trace_3d = go.Scatter3d(
+            x=[pos[node][0] for node in G.nodes()],
+            y=[pos[node][1] for node in G.nodes()],
+            z=[G.nodes[node]['fitness'] for node in G.nodes()],
+            mode='markers+text' if show_labels else 'markers',
+            marker=dict(
+                sizemode='area',  # Makes the node size scale with zoom
+                size=[G.nodes[node]['weight'] for node in G.nodes()],
+                color=node_colors,
+                colorscale='YlGnBu',
+                line_width=2
+            ),
+            text=node_hover_text,
+            hoverinfo='text'
+        )
+        fig.add_trace(node_trace_3d)
+        fig.update_layout(
+            # title="3D Trajectory Network Plot",
+            width=800,
+            height=800,
+            showlegend=False,
+            scene=dict(
+                xaxis=dict(range=x_range),
+                yaxis=dict(range=y_range),
+                zaxis=dict(title='fitness')
+            )
+        )
     else:
         node_trace = go.Scatter(
             x=[],

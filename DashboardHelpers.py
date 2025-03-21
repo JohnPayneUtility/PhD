@@ -62,6 +62,7 @@ def plot2d_box(dataframe, value='final'):
     # runs_per_group = run_counts.iloc[0]
 
     noise_levels = sorted(df['noise'].unique())
+    export = True
 
     fig = px.box(
         df,
@@ -72,14 +73,31 @@ def plot2d_box(dataframe, value='final'):
         # points="all"
         points=False
     )
-
-    fig.update_layout(
-        title="Algorithm Performance on 100 Item OneMax",
-        boxmode="group",  # groups boxes for the same noise level
-        # xaxis_title="$\\sigma$ (Standard Deviation of Gaussian Noise $N(0,\\sigma)$)",
-        xaxis_title="Standard Deviation of Noise",
-        yaxis_title="Best solution found",
-        legend_title="Algorithm",
+    if export:
+        fig.update_layout(
+        # title=dict(
+        #     text="Algorithm Performance on 100 Item OneMax",
+        #     font=dict(size=28, color="black")  # Set title font color to black
+        # ),
+        xaxis=dict(
+            title=dict(
+                text="Standard Deviation of Noise",
+                font=dict(size=24, color="black")  # Set x-axis title font color
+            ),
+            tickfont=dict(size=20, color="black")  # Set x-axis tick label color
+        ),
+        yaxis=dict(
+            title=dict(
+                text="Best solution found",
+                font=dict(size=24, color="black")  # Set y-axis title font color
+            ),
+            tickfont=dict(size=20, color="black")  # Set y-axis tick label color
+        ),
+        legend=dict(
+            title=dict(font=dict(size=24, color="black")),  # Set legend title color
+            font=dict(size=20, color="black")               # Set legend item color
+        ),
+        boxmode="group",
         template="plotly_white"
     )
     # fig = go.Figure(data=[])
@@ -120,6 +138,34 @@ def select_top_runs_by_fitness(all_run_trajectories, n_runs_display, optimisatio
                             reverse=False)
     top_runs = sorted_runs[:n_runs_display] # Cap the number of runs to display
     return top_runs
+
+def filter_negative_LO(local_optima):
+        # Create filtered lists for nodes and fitness values.
+        filtered_nodes = []
+        filtered_fitness_values = []
+        
+        # Loop through nodes and their fitness values, keeping only non-negative ones.
+        for opt, fitness in zip(local_optima["local_optima"], local_optima["fitness_values"]):
+            if fitness >= 0:
+                filtered_nodes.append(opt)
+                filtered_fitness_values.append(fitness)
+        
+        # Create a set of allowed node tuples for filtering edges.
+        allowed_nodes = {tuple(opt) for opt in filtered_nodes}
+        
+        # Filter the edges so that both source and target are in the allowed set.
+        filtered_edges = {}
+        for (source, target), weight in local_optima["edges"].items():
+            if tuple(source) in allowed_nodes and tuple(target) in allowed_nodes:
+                filtered_edges[(source, target)] = weight
+
+        # Create a new dataset with the filtered data.
+        filtered_local_optima = {
+            "local_optima": filtered_nodes,
+            "fitness_values": filtered_fitness_values,
+            "edges": filtered_edges
+        }
+        return filtered_local_optima
 
 def get_mean_run(all_run_trajectories):
     final_fitnesses = [run[1][-1] for run in all_run_trajectories]

@@ -40,12 +40,12 @@ def inverse_n_mut_rate(n_items, noise):
 # ===============================
 
 def AlgosVariable(prob_info, base_params, fitness_functions, noise_values, runs, eval_limits = None):
-    algorithm_classes = [MuPlusLamdaEA]
+    algorithm_classes = [MuPlusLamdaEA, UMDA, PCEA]
     extra_params_by_algo = {
         'MuPlusLamdaEA': [
             # {'mu': 1, 'lam': 1, 'mutate_function': tools.mutFlipBit, 'mutate_params': {'indpb': 1/100}},
-            # {'mu': 1, 'lam': 1, 'mutate_function': tools.mutFlipBit, 'mutate_params': inverse_n_mut_rate},
-            {'mu': dynamic_pop_size_mu, 'lam': 1, 'mutate_function': tools.mutFlipBit, 'mutate_params': inverse_n_mut_rate},
+            {'mu': 1, 'lam': 1, 'mutate_function': tools.mutFlipBit, 'mutate_params': inverse_n_mut_rate},
+            # {'mu': dynamic_pop_size_mu, 'lam': 1, 'mutate_function': tools.mutFlipBit, 'mutate_params': inverse_n_mut_rate},
         ],
         'UMDA': [
             {'pop_size': dynamic_pop_size_UMDA},
@@ -63,7 +63,7 @@ def AlgosVariable(prob_info, base_params, fitness_functions, noise_values, runs,
                                 eval_limits,
                                 num_runs=runs,
                                 base_seed=0,
-                                parallel=False)
+                                parallel=True)
     pd.set_option('display.max_columns', None)
     # print(results_df.head(20))
     save_or_append_results(results_df)
