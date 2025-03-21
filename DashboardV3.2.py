@@ -1028,29 +1028,29 @@ def update_plot(optimum, PID, options, run_options, layout_value, plot_type, hov
             else:
                 node_label = lon_node_mapping[key]
 
-                # NOISE CLOUD FOR LON
-                # for i in range(10):
-                #     from FitnessFunctions import eval_noisy_kp_v1
-                #     from ProblemScripts import load_problem_KP
-                #     n_items, capacity, optimal, values, weights, items_dict, problem_info = load_problem_KP('f1_l-d_kp_10_269')
-                #     noisy_node_label = f"Noisy {node_label} {i+1}"
-                #     noisy_fitness = eval_noisy_kp_v1(opt, items_dict=items_dict, capacity=capacity, noise_intensity=1)[0]
+            # NOISE CLOUD FOR LON
+            # for i in range(10):
+            #     from FitnessFunctions import eval_noisy_kp_v1
+            #     from ProblemScripts import load_problem_KP
+            #     n_items, capacity, optimal, values, weights, items_dict, problem_info = load_problem_KP('f1_l-d_kp_10_269')
+            #     noisy_node_label = f"Noisy {node_label} {i+1}"
+            #     noisy_fitness = eval_noisy_kp_v1(opt, items_dict=items_dict, capacity=capacity, noise_intensity=1)[0]
 
-                #     noisy_node_size = 15 
-                #     G.add_node(noisy_node_label, solution=opt, fitness=noisy_fitness, color='pink', size=noisy_node_size)
-                #     # Add an edge from the LON node to this noisy node
-                #     # G.add_edge(node_label, noisy_node_label, weight=STN_edge_size_slider, color='pink', style='dotted')
+            #     noisy_node_size = 15 
+            #     G.add_node(noisy_node_label, solution=opt, fitness=noisy_fitness, color='pink', size=noisy_node_size)
+            #     # Add an edge from the LON node to this noisy node
+            #     # G.add_edge(node_label, noisy_node_label, weight=STN_edge_size_slider, color='pink', style='dotted')
 
-                # NOISE BOX PLOTS FOR LON
-                node_noise[node_label] = []  # create an empty list for this node's noisy fitness values
-                n_items, capacity, optimal, values, weights, items_dict, problem_info = load_problem_KP(PID)
-                # noise_intensity = int(optimum*0.05)
-                noise_intensity = 1
-                for i in range(30):
-                    # Compute the noisy fitness (assuming eval_noisy_kp_v1 returns a tuple with the fitness as its first element)
-                    # noisy_fitness = eval_noisy_kp_v1_simple(opt, items_dict=items_dict, capacity=capacity, noise_intensity=noise_intensity)[0]
-                    noisy_fitness = eval_noisy_kp_v2(opt, items_dict=items_dict, capacity=capacity, noise_intensity=noise_intensity)[0]
-                    node_noise[node_label].append(noisy_fitness)
+            # NOISE BOX PLOTS FOR LON
+            node_noise[node_label] = []  # create an empty list for this node's noisy fitness values
+            n_items, capacity, optimal, values, weights, items_dict, problem_info = load_problem_KP(PID)
+            # noise_intensity = int(optimum*0.05)
+            noise_intensity = 1
+            for i in range(30):
+                # Compute the noisy fitness (assuming eval_noisy_kp_v1 returns a tuple with the fitness as its first element)
+                # noisy_fitness = eval_noisy_kp_v1_simple(opt, items_dict=items_dict, capacity=capacity, noise_intensity=noise_intensity)[0]
+                noisy_fitness = eval_noisy_kp_v2(opt, items_dict=items_dict, capacity=capacity, noise_intensity=noise_intensity)[0]
+                node_noise[node_label].append(noisy_fitness)
         fitness_dict = {node: data['fitness'] for node, data in G.nodes(data=True)} # for noise box plots
         print("DEBUG: node_noise keys:", list(node_noise.keys()))
 
@@ -1240,7 +1240,7 @@ def update_plot(optimum, PID, options, run_options, layout_value, plot_type, hov
                 z0 = G.nodes[u]['fitness']
                 z1 = G.nodes[v]['fitness']
                 z_values = np.linspace(z0, z1, len(curve))
-                trace = go.Scatter3d(
+                edge_trace = go.Scatter3d(
                     x=list(curve[:, 0]),
                     y=list(curve[:, 1]),
                     z=list(z_values),
