@@ -2,6 +2,7 @@ import plotly.graph_objects as go
 import plotly.express as px
 import pandas as pd
 import numpy as np
+import math
 
 def plot2d_line(dataframe, value='final'):
     # assert "my_column" in df.columns, "DataFrame must contain column 'my_column'"
@@ -254,6 +255,63 @@ def convert_to_single_edges_format(data):
     #     converted_data["edges"][(source, target)] = weight
 
     return converted_data
+
+def filter_local_optima(converted_data, fitness_percent):
+    """
+    Filter the converted_data to keep only the local optima that have fitness values
+    in the top 'fitness_percent' (e.g., 25 for top 25%). Also, only retain edges where
+    both the source and target are in the kept local optima.
+
+    Parameters:
+        converted_data (dict): Dictionary with keys "local_optima", "fitness_values", and "edges".
+        fitness_percent (float): The percentage (0 < fitness_percent <= 100) of top fitness values to keep.
+
+    Returns:
+        dict: A new dictionary with filtered local optima, fitness values, and edges.
+    """
+    if not (0 < fitness_percent <= 100):
+        raise ValueError("fitness_percent must be between 0 and 100.")
+
+    local_optima = converted_data["local_optima"]
+    fitness_values = converted_data["fitness_values"]
+    edges = converted_data.get("edges", {})
+
+    n = len(local_optima)
+    # Determine how many optima to keep; at least one
+    num_to_keep = max(1, math.ceil((fitness_percent / 100) * n))
+
+    # Create a list of tuples: (index, local_optimum, fitness)
+    pairs = [(i, opt, fit) for i, (opt, fit) in enumerate(zip(local_optima, fitness_values))]
+    # Sort by fitness descending (assuming higher fitness is better)
+    pairs_sorted = sorted(pairs, key=lambda x: x[2], reverse=True)
+    # Keep only the top num_to_keep entries
+    top_pairs = pairs_sorted[:num_to_keep]
+    
+    # Get the indices of the kept optima
+    kept_indices = {i for i, _, _ in top_pairs}
+    
+    # Create new lists for the filtered optima and fitness values
+    new_local_optima = [local_optima[i] for i in range(n) if i in kept_indices]
+    new_fitness_values = [fitness_values[i] for i in range(n) if i in kept_indices]
+    
+    # Build a set of the kept local optima for fast membership testing.
+    # If an optimum is a list, we convert it to a tuple.
+    kept_set = set(tuple(opt) if isinstance(opt, list) else opt for opt in new_local_optima)
+    
+    # Filter edges: only keep an edge if both source and target are in kept_set.
+    new_edges = {}
+    for (source, target), weight in edges.items():
+        # Convert source/target to tuple if needed
+        src = tuple(source) if isinstance(source, list) else source
+        tgt = tuple(target) if isinstance(target, list) else target
+        if src in kept_set and tgt in kept_set:
+            new_edges[(source, target)] = weight
+
+    return {
+        "local_optima": new_local_optima,
+        "fitness_values": new_fitness_values,
+        "edges": new_edges,
+    }
 
 def quadratic_bezier(start, end, curvature=0.2, n_points=20):
     """

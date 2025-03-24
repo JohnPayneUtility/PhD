@@ -34,6 +34,7 @@ LON_hidden_cols = ['problem_name',
                    'edges'
                    ]
 LON_display_columns = [col for col in df_LONs.columns if col not in LON_hidden_cols]
+print(df_LONs['PID'].unique())
 
 # ----------
 
@@ -50,6 +51,7 @@ df_no_lists.drop([
     'sol_iterations',
     'sol_transitions',
 ], axis=1, inplace=True)
+print(df_no_lists['PID'].unique())
 
 # Create subset DataFrames
 display1_df = df.copy()
@@ -147,6 +149,7 @@ app.layout = html.Div([
     dcc.Store(id="table2-selected-store", data=[]),
     dcc.Store(id="optimum", data=[]),
     dcc.Store(id="PID", data=[]),
+    dcc.Store(id="opt_goal", data=[]),
 
     # Hidden stores for plotting data
     dcc.Store(id="plot_2d_data", data=[]),
@@ -155,6 +158,7 @@ app.layout = html.Div([
     dcc.Store(id="STN_data_processed", data=[]),
     dcc.Store(id="STN_series_labels", data=[]),
     dcc.Store(id="noisy_fitnesses_data", data=[]),
+    dcc.Store(id="axis-values", data=[]),
     
     # Tabbed section for problem selection
     html.Div([
@@ -240,11 +244,18 @@ app.layout = html.Div([
         "borderRadius": "5px",
         "margin": "10px",
     }),
-    # PORTED FROM V1
+    # RUN DISPLAY OPTIONS
     html.Div([
-        html.Label("Select number of runs to show:"),
-    ], style={'display': 'inline-block', 'margin-right': '10px'}),
-    html.Div([
+        html.Label(" Select starting run: "),
+        dcc.Input(
+            id='run-index',
+            type='number',
+            min=0,
+            max=1000,
+            step=1,
+            value=0
+        ),
+        html.Label(" Number of runs to show: "),
         dcc.Input(
             id='run-selector',
             type='number',
@@ -258,13 +269,34 @@ app.layout = html.Div([
         id='run-options',
         options=[
             {'label': 'Show best run', 'value': 'show_best'},
-            {'label': 'Show mean runs', 'value': 'show_mean'},
-            {'label': 'Show median runs', 'value': 'show_median'},
+            {'label': 'Show mean run', 'value': 'show_mean'},
+            {'label': 'Show median run', 'value': 'show_median'},
             {'label': 'Show worst run', 'value': 'show_worst'}
         ],
-        value=[]
+        value=[],
+        labelStyle={'display': 'inline-block', 'margin-right': '10px'}
     ),
     html.Hr(),
+    # LON OPTIONS
+    html.Label(" Show top '%' of LON nodes: "),
+    dcc.Input(
+        id='LON-fit-percent',
+        type='number',
+        min=1,
+        max=100,
+        step=1,
+        value=100
+    ),
+    dcc.Checklist(
+        id='LON-options',
+        options=[
+            {'label': 'Filter negative', 'value': 'LON-filter-neg'},
+        ],
+        value=[],
+        labelStyle={'display': 'inline-block', 'margin-right': '10px'}
+    ),
+    html.Hr(),
+    # PLOTTING OPTIONS
     dcc.Checklist(
         id='options',
         options=[
@@ -313,71 +345,70 @@ app.layout = html.Div([
         placeholder='Select hover information',
         style={'width': '50%', 'marginTop': '10px'}
     ),
+    # PLOT ANGLE OPTIONS
+    html.Label(" Azimuth degrees: "),
     dcc.Input(
         id='azimuth_deg',
         type='number',
-        value=35,       # initial value
+        value=35,
         min=0,
         max=180,
         step=1,
         style={'width': '100px'}
     ),
+    html.Label(" Elevation degrees: "),
     dcc.Input(
         id='elevation_deg',
         type='number',
-        value=60,       # initial value
+        value=60,
         min=0,
         max=90,
         step=1,
         style={'width': '100px'}
     ),
-    dcc.Checklist(
-        id='use-range-sliders',
-        options=[
-            {'label': 'limit axis ranges', 'value': 'ENABLED'}
-        ],
-        value=[]  # Default is unchecked
-    ),
-    html.Div(
-    [
-        html.Label("X-axis range"),
-        dcc.Slider(
-            id='x-axis-slider',
-            min=1,
-            max=10,
-            step=0.1,
-            value=5,  # Default range
-            marks={i: f"{i}" for i in range(1, 11)}
-        )
-    ],
-    id='x-slider-container',  # Add an ID for the container
-    style={'display': 'none'}  # Initially hidden
-    ),
-    html.Div(
-        [
-            html.Label("Y-axis range"),
-            dcc.Slider(
-                id='y-axis-slider',
-                min=1,
-                max=10,
-                step=0.1,
-                value=5,  # Default range
-                marks={i: f"{i}" for i in range(1, 11)}
-            )
-        ],
-        id='y-slider-container',  # Add an ID for the container
-        style={'display': 'none'}  # Initially hidden
-    ),
-    html.Label("Node size scaling:"),
-    dcc.Slider(
-    id='node-size-slider',
-    min=1,
+    # NODE SIZE INPUTS
+    html.Label("STN Node Min:"),
+    dcc.Input(
+    id='STN-node-min',
+    type='number',
+    min=0,
     max=100,
-    step=1,
-    value=50,  # Default scaling factor
-    marks={i: str(i) for i in range(1, 101, 10)},
-    tooltip={"placement": "bottom", "always_visible": False}
+    step=0.01,
+    value=5,
+    style={'width': '100px'}
     ),
+    html.Label("STN Node Max:"),
+    dcc.Input(
+    id='STN-node-max',
+    type='number',
+    min=0,
+    max=100,
+    step=0.01,
+    value=20,
+    style={'width': '100px'}
+    ),
+    html.Label("LON Node Min:"),
+    dcc.Input(
+    id='LON-node-min',
+    type='number',
+    min=0,
+    max=100,
+    step=0.01,
+    value=10,
+    style={'width': '100px'}
+    ),
+    html.Label("LON Node Max:"),
+    dcc.Input(
+    id='LON-node-max',
+    type='number',
+    min=0,
+    max=100,
+    step=0.01,
+    value=10.1,
+    style={'width': '100px'}
+    ),
+    html.Br(),
+    # EDGE SIZE INPUTS
     html.Label("LON Edge thickness:"),
     dcc.Slider(
     id='LON-edge-size-slider',
@@ -438,10 +469,63 @@ app.layout = html.Div([
         value=1.0,
         marks={i/10: f"{i/10:.1f}" for i in range(1, 11)},
     ),
+    html.Hr(),
+    # AXIS RANGE ADJUSTMENT OPTIONS
+    html.Label("Axis options:", style={'fontWeight': 'bold'}),
+    html.Div([
+        html.Label(" x min: "),
+        dcc.Input(
+            id='custom_x_min',
+            type='number',
+            value=None,
+            # placeholder='Custom x min',
+            style={'marginRight': '10px'}
+        ),
+        html.Label(" x max: "),
+        dcc.Input(
+            id='custom_x_max',
+            type='number',
+            value=None,
+            # placeholder='Custom x max'
+        ),
+        html.Label(" y min: "),
+        dcc.Input(
+            id='custom_y_min',
+            type='number',
+            value=None,
+            # placeholder='Custom x min',
+            style={'marginRight': '10px'}
+        ),
+        html.Label(" y max: "),
+        dcc.Input(
+            id='custom_y_max',
+            type='number',
+            value=None,
+            # placeholder='Custom x max'
+        ),
+        html.Label(" z min: "),
+        dcc.Input(
+            id='custom_z_min',
+            type='number',
+            value=None,
+            # placeholder='Custom x min',
+            style={'marginRight': '10px'}
+        ),
+        html.Label(" z max: "),
+        dcc.Input(
+            id='custom_z_max',
+            type='number',
+            value=None,
+            # placeholder='Custom x max'
+        ),
+    ], style={'display': 'flex', 'flexDirection': 'row'}),
+    html.Hr(),
+    # LON/STN PLOT AND INFO
     dcc.Graph(id='trajectory-plot'),
     html.Div(id="print_STN_series_labels", style={
         "margin": "10px", "padding": "10px", "border": "1px solid #ccc"
     }),
+    html.Div(id='run-print-info', style={'whiteSpace': 'pre-wrap', 'fontFamily': 'monospace'}),
 ])
 
 # ------------------------------
@@ -586,7 +670,8 @@ def update_table2(data):
 
 @app.callback(
     [Output("optimum", "data"),
-    Output("PID", "data")],
+    Output("PID", "data"),
+    Output("opt_goal", 'data')],
     Input("data-problem-specific", "data")
 )
 def update_table2(data):
@@ -595,7 +680,8 @@ def update_table2(data):
     df = pd.DataFrame(data)
     optimum = df["opt_global"].iloc[0]
     PID = df["PID"].iloc[0]
-    return optimum, PID
+    opt_goal = df["problem_goal"].iloc[0]
+    return optimum, PID, opt_goal
 
 # ------------------------------
 # Callback: Display Selected Rows from Table 2
@@ -857,26 +943,61 @@ def update_table2_selected(series_list):
     return f"Plotted series: {series_list}"
 
 # ==========
-# plot
+# main plot callbacks
 # ==========
+
+# callback for custom axis values
 @app.callback(
-    Output('trajectory-plot', 'figure'),
+    Output('axis-values', 'data'),
+    [Input('custom_x_min', 'value'),
+     Input('custom_x_max', 'value'),
+     Input('custom_y_min', 'value'),
+     Input('custom_y_max', 'value'),
+     Input('custom_z_min', 'value'),
+     Input('custom_z_max', 'value')]
+)
+def clean_axis_values(custom_x_min, custom_x_max, custom_y_min, custom_y_max, custom_z_min, custom_z_max):
+    def clean(val):
+        # If the input is empty, an empty string, or None, return None.
+        # Otherwise, assume it's a valid number (or you could cast to float/int).
+        if val in [None, ""]:
+            return None
+        return val  # or float(val) if needed
+    
+    return {
+        "custom_x_min": clean(custom_x_min),
+        "custom_x_max": clean(custom_x_max),
+        "custom_y_min": clean(custom_y_min),
+        "custom_y_max": clean(custom_y_max),
+        "custom_z_min": clean(custom_z_min),
+        "custom_z_max": clean(custom_z_max)
+    }
+
+# callback for main plot
+@app.callback(
+    [Output('trajectory-plot', 'figure'),
+     Output('run-print-info', 'children')],
     [Input("optimum", "data"),
      Input("PID", "data"),
+     Input("opt_goal", "data"),
      Input('options', 'value'),
      Input('run-options', 'value'),
+     Input('LON-fit-percent', 'value'),
+     Input('LON-options', 'value'),
      Input('layout', 'value'),
      Input('plotType', 'value'),
      Input('hover-info', 'value'),
      Input('azimuth_deg', 'value'),
      Input('elevation_deg', 'value'),
      Input('STN_data_processed', 'data'),
+     Input('run-index', 'value'),
      Input('run-selector', 'value'),
      Input('LON_data', 'data'),
-     Input('use-range-sliders', 'value'),
-     Input('x-axis-slider', 'value'),
-     Input('y-axis-slider', 'value'),
-     Input('node-size-slider', 'value'),
+     Input('axis-values', 'data'),
+     Input('STN-node-min', 'value'),
+     Input('STN-node-max', 'value'),
+     Input('LON-node-min', 'value'),
+     Input('LON-node-max', 'value'),
      Input('LON-edge-size-slider', 'value'),
      Input('STN-edge-size-slider', 'value'),
      Input('local-optima-node-opacity-slider', 'value'),
@@ -885,7 +1006,14 @@ def update_table2_selected(series_list):
      Input('STN-edge-opacity-slider', 'value'),
      Input('noisy_fitnesses_data', 'data')]
 )
-def update_plot(optimum, PID, options, run_options, layout_value, plot_type, hover_info_value, azimuth_deg, elevation_deg, all_trajectories_list, n_runs_display, local_optima, use_range_slider, x_slider, y_slider, node_size_slider, LON_edge_size_slider, STN_edge_size_slider, LON_node_opac, LON_edge_opac, STN_node_opac, STN_edge_opac, noisy_fitnesses_list):
+def update_plot(optimum, PID, opt_goal, options, run_options, LO_fit_percent, LON_options, layout_value, plot_type,
+                hover_info_value, azimuth_deg, elevation_deg, all_trajectories_list,
+                run_start_index, n_runs_display, local_optima, axis_values,
+                STN_node_min, STN_node_max, LON_node_min, LON_node_max,
+                LON_edge_size_slider, STN_edge_size_slider, LON_node_opac,
+                LON_edge_opac, STN_node_opac, STN_edge_opac, noisy_fitnesses_list):
+    # LON Options
+    LON_filter_negative = 'LON-filter-neg' in LON_options
     # Options from checkboxes
     show_labels = 'show_labels' in options
     hide_STN_nodes = 'hide_STN_nodes' in options
@@ -913,12 +1041,27 @@ def update_plot(optimum, PID, options, run_options, layout_value, plot_type, hov
     option_curve_edges = True
 
     # Add nodes and edges for each set of trajectories
-    stn_node_mapping = {}  # keys: (solution_tuple, "STN"), value: node label
-    lon_node_mapping = {}  # keys: (solution_tuple, "LON"), value: node label
+    stn_node_mapping = {}
+    lon_node_mapping = {}
     start_nodes = set()
     end_nodes = set()
     overall_best_fitness = 0
     overall_best_node = None
+
+    def generate_run_summary_string(selected_trajectories):
+        lines = []
+        for run_idx, entry in enumerate(selected_trajectories):
+            if len(entry) != 5:
+                lines.append(f"Skipping malformed entry in run {run_idx}")
+                continue
+            unique_solutions, unique_fitnesses, noisy_fitnesses, solution_iterations, transitions = entry
+            # Convert noisy fitnesses to ints if needed:
+            noisy_fitnesses = [int(fit) for fit in noisy_fitnesses]
+            lines.append(f"Run {run_idx}:")
+            for i, solution in enumerate(unique_solutions):
+                lines.append(f"  Solution: {solution} | Fitness: {unique_fitnesses[i]} | Noisy Fitness: {noisy_fitnesses[i]}")
+            lines.append("")  # Blank line between runs
+        return "\n".join(lines)
     
     def add_trajectories_to_graph(all_run_trajectories, edge_color):
         for run_idx, entry in enumerate(all_run_trajectories):
@@ -932,6 +1075,8 @@ def update_plot(optimum, PID, options, run_options, layout_value, plot_type, hov
 
             noisy_fitnesses = [int(fit) for fit in noisy_fitnesses]
             for i, solution in enumerate(unique_solutions):
+                start_node = True if i == 0 else False
+                end_node = True if i == len(unique_solutions) - 1 else False
                 solution_tuple = tuple(solution)
                 key = (solution_tuple, "STN")
                 if key not in stn_node_mapping:
@@ -939,7 +1084,7 @@ def update_plot(optimum, PID, options, run_options, layout_value, plot_type, hov
                     stn_node_mapping[key] = node_label
                     G.add_node(node_label, solution=solution, fitness=unique_fitnesses[i], 
                                iterations=solution_iterations[i], type="STN", run_idx=run_idx, step=i,
-                               color=edge_color)
+                               color=edge_color, start_node=start_node, end_node=end_node)
                     print(f"DEBUG: Added STN node {node_label} for solution {solution_tuple}")
                 else:
                     node_label = stn_node_mapping[key]
@@ -956,10 +1101,6 @@ def update_plot(optimum, PID, options, run_options, layout_value, plot_type, hov
                     G.add_edge(node_label, noisy_node_label, weight=STN_edge_size_slider, 
                                color='gray', edge_type='Noise')
                     print(f"DEBUG: Added Noise edge from {node_label} to {noisy_node_label}")
-                if i == 0:
-                    start_nodes.add(node_label)
-                if i == len(unique_solutions) - 1:
-                    end_nodes.add(node_label)
             # Add transitions as STN edges
             for j, (prev_solution, current_solution) in enumerate(transitions):
                 prev_key = (tuple(prev_solution), "STN")
@@ -970,11 +1111,12 @@ def update_plot(optimum, PID, options, run_options, layout_value, plot_type, hov
                     G.add_edge(src, tgt, weight=STN_edge_size_slider, color=edge_color, edge_type='STN')
                     print(f"DEBUG: Added STN edge from {src} to {tgt}")
 
+    debug_summaries = []
     # Add trajectory nodes if provided
     if all_trajectories_list:
         # Determine optimisation goal
         
-        optimisation_goal = determine_optimisation_goal(all_trajectories_list)
+        optimisation_goal = opt_goal[:3].lower() # now handled via data, update in rest of code
 
         # Add all sets of trajectories to the graph
         # print(f"Checking all_trajectories_list: {all_trajectories_list}")
@@ -984,7 +1126,7 @@ def update_plot(optimum, PID, options, run_options, layout_value, plot_type, hov
 
             selected_trajectories = []
             if n_runs_display > 0:
-                selected_trajectories.extend(all_run_trajectories[:n_runs_display])
+                selected_trajectories.extend(all_run_trajectories[run_start_index:run_start_index+n_runs_display])
             if show_best:
                 selected_trajectories.extend(select_top_runs_by_fitness(all_run_trajectories, 1, optimisation_goal))
             if show_mean:
@@ -997,25 +1139,38 @@ def update_plot(optimum, PID, options, run_options, layout_value, plot_type, hov
 
             add_trajectories_to_graph(selected_trajectories, edge_color)
 
-        # Find the overall best solution across all sets of trajectories
-        if optimisation_goal == "max":
-            overall_best_fitness = max(
-                max(best_fitnesses) for all_run_trajectories in all_trajectories_list for _, best_fitnesses, _, _, _ in all_run_trajectories
+            summary_str = generate_run_summary_string(selected_trajectories)
+            debug_summaries.append((summary_str, edge_color))
+
+        summary_components = []
+        for summary_str, color in debug_summaries:
+            summary_components.append(
+                html.Div(summary_str, style={'color': color, 'whiteSpace': 'pre-wrap', 'marginBottom': '10px'})
             )
-        else:  # Minimisation
-            overall_best_fitness = min(
-                min(best_fitnesses) for all_run_trajectories in all_trajectories_list for _, best_fitnesses, _, _, _ in all_run_trajectories
-            )
+        debug_summary_component = html.Div(summary_components)
+    else:
+        debug_summary_component = html.Div("No trajectory data available.")
+
+        # # Find the overall best solution across all sets of trajectories
+        # if optimisation_goal == "max":
+        #     overall_best_fitness = max(
+        #         max(best_fitnesses) for all_run_trajectories in all_trajectories_list for _, best_fitnesses, _, _, _ in all_run_trajectories
+        #     )
+        # else:  # Minimisation
+        #     overall_best_fitness = min(
+        #         min(best_fitnesses) for all_run_trajectories in all_trajectories_list for _, best_fitnesses, _, _, _ in all_run_trajectories
+        #     )
     
-    
+    node_noise = {}
     if local_optima:
         local_optima = convert_to_single_edges_format(local_optima)
         # local_optima = pd.DataFrame(local_optima).apply(convert_to_single_edges_format, axis=1)
-        local_optima = filter_negative_LO(local_optima)
+        local_optima = filter_local_optima(local_optima, LO_fit_percent)
+        if LON_filter_negative:
+            local_optima = filter_negative_LO(local_optima)
         print("DEBUG: Number of local optima:", len(local_optima["local_optima"]))
         
         # ------
-        node_noise = {}
         # add nodes for LON
         for opt, fitness in zip(local_optima["local_optima"], local_optima["fitness_values"]):
             solution_tuple = tuple(opt)
@@ -1049,7 +1204,7 @@ def update_plot(optimum, PID, options, run_options, layout_value, plot_type, hov
             for i in range(30):
                 # Compute the noisy fitness (assuming eval_noisy_kp_v1 returns a tuple with the fitness as its first element)
                 # noisy_fitness = eval_noisy_kp_v1_simple(opt, items_dict=items_dict, capacity=capacity, noise_intensity=noise_intensity)[0]
-                noisy_fitness = eval_noisy_kp_v2(opt, items_dict=items_dict, capacity=capacity, noise_intensity=noise_intensity)[0]
+                noisy_fitness = eval_noisy_kp_v1(opt, items_dict=items_dict, capacity=capacity, noise_intensity=noise_intensity)[0]
                 node_noise[node_label].append(noisy_fitness)
         fitness_dict = {node: data['fitness'] for node, data in G.nodes(data=True)} # for noise box plots
         print("DEBUG: node_noise keys:", list(node_noise.keys()))
@@ -1087,30 +1242,50 @@ def update_plot(optimum, PID, options, run_options, layout_value, plot_type, hov
                 color = px.colors.sample_colorscale('plasma', norm_weight)[0]
                 data['norm_weight'] = norm_weight
                 data['color'] = color
+    
+    # Normalise solution iterations
+    stn_iterations = [
+    G.nodes[node].get('iterations', 1)
+        for node in G.nodes()
+        if "STN" in node
+    ]
+    if stn_iterations:
+        min_STN_iter = min(stn_iterations)
+        max_STN_iter = max(stn_iterations)
 
-    # Assign node weights
-    node_size_slider = 1
+    # Assign node sizes
     for node in G.nodes():
         if "Local Optimum" in node:
             # For LON nodes: weight is the sum of incoming edge weights.
             incoming_edges = G.in_edges(node, data=True)
             node_weight = sum(edge_data.get('weight', 0) for _, _, edge_data in incoming_edges)
-            node_weight = node_weight * node_size_slider
+            node_size = LON_node_min + node_weight * (LON_node_max - LON_node_min)
         elif "STN" in node:
             # For STN nodes: weight comes from the 'iterations' attribute.
-            node_weight = G.nodes[node].get('iterations', 1) * node_size_slider
+            # node_weight = G.nodes[node].get('iterations', 1)
+            iter = G.nodes[node].get('iterations', 1)
+            # Normalize to the 0-1 range
+            norm_iter = (iter - min_STN_iter) / (max_STN_iter - min_STN_iter) if max_STN_iter > min_STN_iter else 0.5
+            node_size = STN_node_min + norm_iter * (STN_node_max - STN_node_min)
         else:
             # For any other node, assign a default weight of 1.
-            node_weight = 1
+            node_size = 1
         # Set the computed weight as a node property.
-        G.nodes[node]['weight'] = node_weight
+        G.nodes[node]['size'] = node_size
     
     # node colours
     for node, data in G.nodes(data=True):
+        if "Local Optimum" in node:
+            data['color'] = 'grey'
+        if "STN" in node:
+            if data.get('start_node', False):
+                data['color'] = 'yellow'
+            if data.get('end_node', False):
+                data['color'] = 'brown'
         if data.get('fitness') == optimum:
             data['color'] = 'red'
-        # else:
-        #     data['color'] = 'black'
+            if "Local Optimum" in node:
+                data['size'] = LON_node_max
 
 
     # Prepare node positions based on selected layout
@@ -1133,14 +1308,14 @@ def update_plot(optimum, PID, options, run_options, layout_value, plot_type, hov
 
         mds = MDS_sklearn(n_components=2, dissimilarity='precomputed', random_state=42)
         positions_2d = mds.fit_transform(dissimilarity_matrix)
-        pos = {node: positions_2d[i] for i, node in enumerate(G.nodes())}
-        # for i, sol in enumerate(solutions):
-        #     unique_solution_positions[sol] = positions_2d[i]
+        # pos = {node: positions_2d[i] for i, node in enumerate(G.nodes())}
+        for i, sol in enumerate(solutions):
+            unique_solution_positions[sol] = positions_2d[i]
         # # Now assign each node's position based on its solution.
-        # pos = {}
-        # for node, data in G.nodes(data=True):
-        #     sol = tuple(data['solution'])
-        #     pos[node] = unique_solution_positions[sol]
+        pos = {}
+        for node, data in G.nodes(data=True):
+            sol = tuple(data['solution'])
+            pos[node] = unique_solution_positions[sol]
     elif layout == 'tsne':
         # Use t-SNE to position nodes based on dissimilarity (Hamming distance)
         # solutions = [data['solution'] for _, data in G.nodes(data=True)]
@@ -1185,20 +1360,6 @@ def update_plot(optimum, PID, options, run_options, layout_value, plot_type, hov
 
 # ---------- PLOTTING -----------
 
-    # Set x and y axis ranges based on slider
-    if 'ENABLED' in use_range_slider:
-        x_range = [-x_slider, x_slider]
-        y_range = [-y_slider, y_slider]
-    else:
-        if len(G.nodes) > 0:
-            x_values = [pos[node][0] for node in G.nodes()]
-            y_values = [pos[node][1] for node in G.nodes()]
-            x_range = [min(x_values) - 1, max(x_values) + 1]
-            y_range = [min(y_values) - 1, max(y_values) + 1]
-        else:
-            x_range = [-10, 10]  # Default
-            y_range = [-10, 10]  # Default
-
     # Debugging
     print("DEBUG: Total nodes in G:", len(G.nodes()))
     print("DEBUG: Nodes and their properties:")
@@ -1226,16 +1387,36 @@ def update_plot(optimum, PID, options, run_options, layout_value, plot_type, hov
         dx = 0.05  # horizontal offset for the mini boxplot
 
         traces = []
-
         # ----- Add edge traces -----
         edge_traces = []
+        edge_counts = {}
         for u, v, key, data in G.edges(data=True, keys=True):
             # Use only the first two coordinates for x, y from pos; get z from the node's fitness.
+            if "STN" in data.get("edge_type", ""):
+                pair = (u, v)
+                edge_counts[pair] = edge_counts.get(pair, 0) + 1
+            current_edge_index = {}
             if option_curve_edges == True and "STN" in data.get("edge_type", ""):
                 print("DEBUG: Using curved edge for edge from", u, "to", v, "with edge_type:", data.get("edge_type", ""))
                 start = pos[u][:2]
                 end = pos[v][:2]
-                curve = quadratic_bezier(start, end, curvature=0.2, n_points=20)
+                # Determine the edge's position among all edges connecting the same two nodes
+                pair = (u, v)
+                if pair not in current_edge_index:
+                    current_edge_index[pair] = 0
+                idx = current_edge_index[pair]
+                total = edge_counts.get(pair, 1)
+                
+                # Compute curvature: if multiple edges exist, spread the curvature values between -base and +base.
+                # Here, base curvature is 0.2.
+                if total > 1:
+                    curvature = 0.2 * (idx - (total - 1) / 2) / ((total - 1) / 2)
+                else:
+                    curvature = 0.2
+                    
+                current_edge_index[pair] += 1
+
+                curve = quadratic_bezier(start, end, curvature=curvature, n_points=20)
                 print("DEBUG: Curve shape:", curve.shape)
                 z0 = G.nodes[u]['fitness']
                 z1 = G.nodes[v]['fitness']
@@ -1245,7 +1426,7 @@ def update_plot(optimum, PID, options, run_options, layout_value, plot_type, hov
                     y=list(curve[:, 1]),
                     z=list(z_values),
                     mode='lines',
-                    line=dict(width=10, color=data.get('color', 'green')),
+                    line=dict(width=5, color=data.get('color', 'green')),
                     hoverinfo='none'
                 )
             else:
@@ -1260,7 +1441,8 @@ def update_plot(optimum, PID, options, run_options, layout_value, plot_type, hov
                     y=[y0, y1],
                     z=[z0, z1],
                     mode='lines',
-                    line=dict(width=data.get('norm_weight', 0.5)*10, color=data.get('color', 'red')),
+                    line=dict(width=data.get('norm_weight', 0.5)*20, color=data.get('color', 'red')),
+                    # line=dict(width=3, color=data.get('color', 'red')),
                     opacity=1,
                     hoverinfo='none',
                     showlegend=False
@@ -1278,10 +1460,10 @@ def update_plot(optimum, PID, options, run_options, layout_value, plot_type, hov
             node_x.append(x)
             node_y.append(y)
             # Use fitness_dict to get the z value, or you could use attr['fitness'] directly if that is available.
-            node_z.append(fitness_dict[node])
+            node_z.append(attr['fitness'])
             
             # Get node weight and color from the node's attributes:
-            node_sizes.append(5+attr.get('weight', 2)*0.2)
+            node_sizes.append(attr.get('size', 1))
             node_colors.append(attr.get('color', 'blue'))
 
         node_trace = go.Scatter3d(
@@ -1416,43 +1598,99 @@ def update_plot(optimum, PID, options, run_options, layout_value, plot_type, hov
                                 trace_cap_top, trace_cap_bottom,
                                 trace_box,
                                 trace_medianx, trace_mediany])
-        
-        # Build the final figure using the combined traces.
-        # Define desired angles in degrees and convert to radians
-        # azimuth_deg = 35
-        # elevation_deg = 60
+                    
+        # Camera position
         azimuth = np.deg2rad(azimuth_deg)
         elevation = np.deg2rad(elevation_deg)
         r = 2.5
-
         camera_eye = dict(
             x = r * np.cos(elevation) * np.cos(azimuth),
             y = r * np.cos(elevation) * np.sin(azimuth),
             z = r * np.sin(elevation)
         )
+        # create substitue values for when custom axis range missing component
+        if len(G.nodes) > 0:
+            # Get values based on data
+            x_values = [pos[node][0] for node in G.nodes()]
+            y_values = [pos[node][1] for node in G.nodes()]
+            fit_values = [data['fitness'] for _, data in G.nodes(data=True)]
+            # Set range based on values
+            x_min_sub, x_max_sub = min(x_values) - 1, max(x_values) + 1
+            y_min_sub, y_max_sub = min(y_values) - 1, max(y_values) + 1
+            z_min_sub, z_max_sub = min(fit_values) - 1, max(fit_values) + 1
+            if node_noise:
+                # If noise then include in range calculation
+                z_max_sub = max(max(noisy_list) for noisy_list in node_noise.values()) + 1
+                z_min_sub = min(min(noisy_list) for noisy_list in node_noise.values()) - 1
+        else: # Default
+            x_min_sub, x_max_sub, y_min_sub, y_max_sub, z_min_sub, z_max_sub = 1
+        # Axis settings dicts
+        xaxis_settings=dict(
+            title='X',
+            titlefont=dict(size=24, color='black'),
+            tickfont=dict(size=16, color='black')
+        )
+        yaxis_settings=dict(
+            title='Y',
+            titlefont=dict(size=24, color='black'),
+            tickfont=dict(size=16, color='black')
+        )
+        zaxis_settings=dict(
+            title='Fitness',
+            titlefont=dict(size=24, color='black'),  # Larger z-axis label
+            tickfont=dict(size=16, color='black')
+        )
+        # Apply custom axis options
+        if axis_values.get("custom_x_min") is not None or axis_values.get("custom_x_max") is not None:
+            custom_x_min = (
+                axis_values.get("custom_x_min")
+                if axis_values.get("custom_x_min") is not None
+                else x_min_sub
+            )
+            custom_x_max = (
+                axis_values.get("custom_x_max")
+                if axis_values.get("custom_x_max") is not None
+                else x_max_sub
+            )
+            xaxis_settings["range"] = [custom_x_min, custom_x_max]
+        if axis_values.get("custom_y_min") is not None or axis_values.get("custom_y_max") is not None:
+            custom_y_min = (
+                axis_values.get("custom_y_min")
+                if axis_values.get("custom_y_min") is not None
+                else y_min_sub
+            )
+            custom_y_max = (
+                axis_values.get("custom_y_max")
+                if axis_values.get("custom_y_max") is not None
+                else y_max_sub
+            )
+            yaxis_settings["range"] = [custom_y_min, custom_y_max]
+        if axis_values.get("custom_z_min") is not None or axis_values.get("custom_z_max") is not None:
+            custom_z_min = (
+                axis_values.get("custom_z_min")
+                if axis_values.get("custom_z_min") is not None
+                else z_min_sub
+            )
+            custom_z_max = (
+                axis_values.get("custom_z_max")
+                if axis_values.get("custom_z_max") is not None
+                else z_max_sub
+            )
+            zaxis_settings["range"] = [custom_z_min, custom_z_max]
+
+        # Create plot
         fig = go.Figure(data=traces)
         fig.update_layout(
+        showlegend=False,
         width=1200,
         height=1200,
         scene=dict(
             camera=dict(
                 eye=camera_eye
             ),
-            xaxis=dict(
-                title='X',
-                titlefont=dict(size=24, color='black'),
-                tickfont=dict(size=16, color='black')
-            ),
-            yaxis=dict(
-                title='Y',
-                titlefont=dict(size=24, color='black'),
-                tickfont=dict(size=16, color='black')
-            ),
-            zaxis=dict(
-                title='Fitness',
-                titlefont=dict(size=24, color='black'),  # Larger z-axis label
-                tickfont=dict(size=16, color='black')
-            )
+            xaxis=xaxis_settings,
+            yaxis=yaxis_settings,
+            zaxis=zaxis_settings
         ),
         margin=dict(l=0, r=0, t=0, b=0),
         template="plotly_white"
@@ -1576,7 +1814,7 @@ def update_plot(optimum, PID, options, run_options, layout_value, plot_type, hov
                             margin=dict(b=20, l=5, r=5, t=40),
                             xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
                             yaxis=dict(showgrid=False, zeroline=False, showticklabels=False)))
-    return fig
+    return fig, debug_summary_component
 
 # ==========
 # RUN

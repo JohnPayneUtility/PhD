@@ -22,8 +22,8 @@ basis_experiment = AlgosVariable
 eval_limit = 100000
 runs = 30
 selected_problems = [
-        'onemax',
-        # 'knapsack',
+        # 'onemax',
+        'knapsack',
         # 'rastrigin',
     ]
 noise_values = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
@@ -38,7 +38,7 @@ eval_limits = [38392, 38392, 41066, 44477, 50728, 56851]
 
 
 create_STNs = True
-create_LONs = False
+create_LONs = True
 
 
 # ==============================
@@ -58,7 +58,7 @@ kp_problems = [
     # ('f9_l-d_kp_5_80', 130),
     # ('knapPI_1_10000_1000_1', 563647),
     # ('knapPI_1_1000_1000_1', 54503),
-    # ('knapPI_1_100_1000_1', 9147),
+    ('knapPI_1_100_1000_1', 9147),
     # ('knapPI_1_2000_1000_1', 110625),
     # ('knapPI_1_200_1000_1', 11238),
     # ('knapPI_1_5000_1000_1', 276457),
@@ -158,7 +158,7 @@ if __name__ == '__main__':
                         n_flips_pert = 2,
                         pert_attempts = 1500,
                         fitness_function = LON_fit_func,
-                        n_runs = 100,
+                        n_runs = 500,
                         # compression_accs = ['None'])
                         compression_accs = ['None', 0, 1, 2, 5, 10])
     # ---------- Rastrigin ----------
