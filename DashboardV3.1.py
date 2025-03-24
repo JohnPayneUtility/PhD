@@ -886,6 +886,7 @@ def update_table2_selected(series_list):
      Input('noisy_fitnesses_data', 'data')]
 )
 def update_plot(optimum, PID, options, run_options, layout_value, plot_type, hover_info_value, azimuth_deg, elevation_deg, all_trajectories_list, n_runs_display, local_optima, use_range_slider, x_slider, y_slider, node_size_slider, LON_edge_size_slider, STN_edge_size_slider, LON_node_opac, LON_edge_opac, STN_node_opac, STN_edge_opac, noisy_fitnesses_list):
+    print("DEBUG: ==================== REFRESH ====================")
     # Options from checkboxes
     show_labels = 'show_labels' in options
     hide_STN_nodes = 'hide_STN_nodes' in options
@@ -1060,25 +1061,29 @@ def update_plot(optimum, PID, options, run_options, layout_value, plot_type, hov
                 G.add_edge(source_label, target_label, weight=weight, color='black', edge_type='LON')
         
         # Normalise edge weights for edges between Local Optimum nodes
+        print("DEBUG: ---------- LON NODE WEIGHTS ----------")
         LON_edge_weight_all = [data.get('weight', 2) 
             for u, v, key, data in G.edges(data=True, keys=True) 
             if "Local Optimum" in u and "Local Optimum" in v]
+        print("DEBUG: LON_edge_weight_all:", LON_edge_weight_all)
         if LON_edge_weight_all:
             LON_edge_weight_min = min(LON_edge_weight_all)
             LON_edge_weight_max = max(LON_edge_weight_all)
-            # ... proceed with normalization
+            print("DEBUG: LON_edge_weight_min:", LON_edge_weight_min)
+            print("DEBUG: LON_edge_weight_max:", LON_edge_weight_max)
         else:
             # Handle the case when there are no LON edges.
             LON_edge_weight_min = LON_edge_weight_max = 0.5
+            print("DEBUG: No LON edges found. Setting default weights.")
 
         for u, v, key, data in G.edges(data=True, keys=True):
             if "Local Optimum" in u and "Local Optimum" in v:
                 weight = data.get('weight', 2)  # get un-normalised weight
-                # Normalize the weight (if all weights are equal, default to 0.5)
+                print(f"DEBUG: Processing normalised edge from {u} to {v} with original weight: {weight}")
                 norm_weight = (weight - LON_edge_weight_min) / (LON_edge_weight_max - LON_edge_weight_min) if LON_edge_weight_max > LON_edge_weight_min else 0.5
                 norm_weight = np.clip(norm_weight, 0, 0.9999)  # clip normalised weight
-                # Use a colorscale
                 color = px.colors.sample_colorscale('plasma', norm_weight)[0]
+                print(f"DEBUG: Normalized weight: {norm_weight}, Assigned color: {color}")
                 data['norm_weight'] = norm_weight
                 data['color'] = color
 
@@ -1176,7 +1181,7 @@ def update_plot(optimum, PID, options, run_options, layout_value, plot_type, hov
         # Use MDS to position nodes based on dissimilarity (Hamming distance)
         solutions = [data['solution'] for _, data in G.nodes(data=True)]
         n = len(solutions)
-        print("DEBUG: Number of solutions for MDS:", n)
+        # print("DEBUG: Number of solutions for MDS:", n)
         if len(solutions) == 0:
             print("ERROR: No solutions to run MDS on!")
         else:
