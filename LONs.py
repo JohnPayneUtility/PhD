@@ -58,7 +58,8 @@ def BinaryLON(pert_attempts, len_sol, weights,
               improv_method='best',
               fitness_function=None,
               starting_solution=None,
-              true_fitness_function=None):
+              true_fitness_function=None,
+              target_stop = None):
     """
     """
 
@@ -152,6 +153,11 @@ def BinaryLON(pert_attempts, len_sol, weights,
             # Update the previous optimum for the next iteration
             prev_local_opt = current_local_opt
             prev_fitness = current_fitness
+
+            # Early stopping condition
+            if target_stop is not None and current_fitness >= target_stop:
+                logging.info(f"Target fitness reached: {current_fitness} >= {target_stop}")
+                break # exit loop
             
             # Perturbation step: try to escape the basin of attraction
             pert_attempt += 1
@@ -281,11 +287,12 @@ def create_binary_LON(prob_info,
                       pert_attempts,
                       fitness_function,
                       n_runs,
-                      compression_accs = [None]
+                      compression_accs = [None],
                       ):
     n_items = base_params['sol_length']
     fit_weights = base_params['opt_weights']
     binary_attribute = base_params['attr_function']
+    target_stop = base_params['target_stop']
     base_seed = 0
 
     aggregated_lon_data = {
@@ -309,7 +316,8 @@ def create_binary_LON(prob_info,
                                                             improv_method='best', 
                                                             fitness_function=fitness_function, 
                                                             starting_solution=None, 
-                                                            true_fitness_function=None)
+                                                            true_fitness_function=None,
+                                                            target_stop = target_stop)
         # Aggregate optima
         for opt, fitness in zip(local_optima, fitness_values):
             if opt not in aggregated_lon_data["local_optima"]:
@@ -340,7 +348,7 @@ def create_binary_LON(prob_info,
             "dimensions": prob_info['dimensions'],
             "opt_global": prob_info['opt_global'],
             'PID': prob_info['PID'],
-            'LON_Algo': 'Monotonic_Sequence_Basin_Hopping',
+            'LON_Algo': 'IteratedLocalSearch',
             'n_flips_mut': n_flips_mut,
             'n_flips_pert': n_flips_pert,
             'compression_val': comp_acc,
