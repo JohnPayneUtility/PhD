@@ -344,3 +344,28 @@ def quadratic_bezier(start, end, curvature=0.2, n_points=20):
         curve_points.append(point)
     
     return np.array(curve_points)
+
+def should_label_edge(u, v, STN_hamming, LON_hamming):
+                # Noisy edges should never be labeled.
+                if ("Noisy" in u) or ("Noisy" in v):
+                    return False
+
+                # Determine edge types based on the node labels.
+                is_STN = ("STN" in u)
+                is_LON = ("Local Optimum" in u) or ("Local Optimum" in v)  # you might want to check both endpoints
+
+                # If the edge qualifies as both STN and LON,
+                # only label it if both options are enabled.
+                if is_STN and is_LON:
+                    return STN_hamming and LON_hamming
+
+                # If the edge is STN only, label it only if STN_hamming is True.
+                if is_STN:
+                    return STN_hamming
+
+                # If the edge is LON only, label it only if LON_hamming is True.
+                if is_LON:
+                    return LON_hamming
+
+                # Otherwise (edge does not fall into STN or LON category), label it.
+                return True

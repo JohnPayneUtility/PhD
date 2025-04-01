@@ -362,7 +362,7 @@ app.layout = html.Div([
         type='number',
         value=35,
         min=0,
-        max=180,
+        max=360,
         step=1,
         style={'width': '100px'}
     ),
@@ -1160,7 +1160,7 @@ def update_plot(optimum, PID, opt_goal, options, run_options, STN_lower_fit_limi
                 continue
 
             # Create nodes and store node labels in order for this run
-            node_labels = []  # to store the node labels in order
+            # node_labels = []  # to store the node labels in order
             for i, solution in enumerate(unique_solutions):
                 current_fitness = unique_fitnesses[i]
                 if STN_lower_fit_limit is not None:
@@ -1297,7 +1297,7 @@ def update_plot(optimum, PID, opt_goal, options, run_options, STN_lower_fit_limi
             for i in range(100):
                 # Compute the noisy fitness (assuming eval_noisy_kp_v1 returns a tuple with the fitness as its first element)
                 # noisy_fitness = eval_noisy_kp_v1_simple(opt, items_dict=items_dict, capacity=capacity, noise_intensity=noise_intensity)[0]
-                noisy_fitness = eval_noisy_kp_v1(opt, items_dict=items_dict, capacity=capacity, noise_intensity=noise_intensity)[0]
+                noisy_fitness = eval_noisy_kp_v2(opt, items_dict=items_dict, capacity=capacity, noise_intensity=noise_intensity)[0]
                 node_noise[node_label].append(noisy_fitness)
         fitness_dict = {node: data['fitness'] for node, data in G.nodes(data=True)} # for noise box plots
         # print("DEBUG: node_noise keys:", list(node_noise.keys()))
@@ -1355,8 +1355,9 @@ def update_plot(optimum, PID, opt_goal, options, run_options, STN_lower_fit_limi
             incoming_edges = G.in_edges(node, data=True)
             node_weight = sum(edge_data.get('weight', 0) for _, _, edge_data in incoming_edges)
             node_size = LON_node_min + node_weight * (LON_node_max - LON_node_min)
-            if data.get('fitness') == optimum:
-                node_size = LON_node_max
+            G.nodes[node]['weight'] = node_weight
+            # if data.get('fitness') == optimum:
+                # node_size = LON_node_max
         elif "STN" in node:
             # For STN nodes: weight comes from the 'iterations' attribute.
             # node_weight = G.nodes[node].get('iterations', 1)
@@ -1364,6 +1365,8 @@ def update_plot(optimum, PID, opt_goal, options, run_options, STN_lower_fit_limi
             # Normalize to the 0-1 range
             norm_iter = (iter - min_STN_iter) / (max_STN_iter - min_STN_iter) if max_STN_iter > min_STN_iter else 0.5
             node_size = STN_node_min + norm_iter * (STN_node_max - STN_node_min)
+            if data.get('fitness') == optimum and "Noisy" not in node:
+                node_size = STN_node_max
         else:
             # For any other node, assign a default weight of 1.
             node_size = 1
@@ -1379,9 +1382,58 @@ def update_plot(optimum, PID, opt_goal, options, run_options, STN_lower_fit_limi
                 data['color'] = 'yellow'
             if data.get('end_node', False):
                 data['color'] = 'brown'
+        # print(f"node: {node}, node fitness: {data.get('fitness')}, optimum fitness: {optimum}, is optimum: {data.get('fitness') == optimum}")
         if data.get('fitness') == optimum:
             if "Noisy" not in node:
                 data['color'] = 'red'
+    
+    print('LOCAL OPTIMA STATS CALCULATED')
+    # LON STATS
+    local_optimum_nodes = [node for node in G.nodes() if "Local Optimum" in node]
+    if local_optimum_nodes:
+        mean_in_degree_local = sum(G.in_degree(node) for node in local_optimum_nodes) / len(local_optimum_nodes)
+        mean_out_degree_local = sum(G.out_degree(node) for node in local_optimum_nodes) / len(local_optimum_nodes)
+        num_local_optima = len(local_optimum_nodes)
+        mean_weight = (
+            sum(G.nodes[node].get('weight', 0) for node in local_optimum_nodes) / num_local_optima
+            if num_local_optima > 0 else 0
+        )
+        max_weight = max(G.nodes[node].get('weight', 0) for node in local_optimum_nodes) if num_local_optima > 0 else 0
+        mean_fitness = (
+        sum(G.nodes[node].get('fitness', 0) for node in local_optimum_nodes) / num_local_optima
+        if num_local_optima > 0 else 0
+        )
+        max_fitness = max(G.nodes[node].get('fitness', 0) for node in local_optimum_nodes) if num_local_optima > 0 else 0
+        # Edge stats
+        local_optimum_edges = [
+            (u, v) for u, v, data in G.edges(data=True)
+            if "Local Optimum" in u and "Local Optimum" in v
+        ]
+        local_optimum_edge_weights = [
+            data.get('weight', 0) 
+            for u, v, data in G.edges(data=True)
+            if "Local Optimum" in u and "Local Optimum" in v
+        ]
+        if local_optimum_edge_weights:
+            max_edge_weight = max(local_optimum_edge_weights)
+            mean_edge_weight = sum(local_optimum_edge_weights) / len(local_optimum_edge_weights)
+        else:
+            max_edge_weight = 0
+            mean_edge_weight = 0
+
+        print('num_local_optima', num_local_optima)
+        print('max_fitness', max_fitness)
+        print(f'mean_fitness: {mean_fitness:.2f}')
+        print(f'mean_weight: {mean_weight:.2f}')
+        print(f'max_weight: {max_weight:.2f}')
+        print(f'mean_in_degree_local: {mean_in_degree_local:.2f}')
+        print(f'mean_out_degree_local: {mean_out_degree_local:.2f}')
+        print("num_edges:", len(local_optimum_edges))
+        print(f'max_edge_weight: {max_edge_weight:.2f}')
+        print(f'mean_edge_weight: {mean_edge_weight:.2f}')
+
+
+
 
     print('\033[32mNode Sizes and Colours Assigned\033[0m')
     print('\033[33mCalculating node positions...\033[0m')
@@ -1461,15 +1513,36 @@ def update_plot(optimum, PID, opt_goal, options, run_options, STN_lower_fit_limi
         # pos = {node: solutions[i] for i, node in enumerate(G.nodes())}
     elif layout == 'kamada_kawai':
         print('\033[33mUsing Kamada Kawai\033[0m')
-        pos = nx.kamada_kawai_layout(G, dim=2)
+        # pos = nx.kamada_kawai_layout(G, dim=2)
 
-        # Update positions for noisy nodes
-        for node in G.nodes():
-            if node.startswith("Noisy "):
-                # Extract the corresponding solution node name by removing the "Noisy " prefix.
-                solution_node = node.replace("Noisy ", "", 1)
-                if solution_node in pos:
-                    pos[node] = pos[solution_node]
+        # # Update positions for noisy nodes
+        # for node in G.nodes():
+        #     if node.startswith("Noisy "):
+        #         # Extract the corresponding solution node name by removing the "Noisy " prefix.
+        #         solution_node = node.replace("Noisy ", "", 1)
+        #         if solution_node in pos:
+        #             pos[node] = pos[solution_node]
+        CG = nx.complete_graph(n)  # nodes will be 0,1,...,n-1
+        mapping = {i: solutions_list[i] for i in range(n)}
+        # 3. For each pair, set the edge weight to be the normalized Hamming distance:
+        for i in range(n):
+            for j in range(i+1, n):
+                weight = hamming_distance(solutions_list[i], solutions_list[j])
+                CG[i][j]['weight'] = 1
+                # Since H is undirected, this weight is used for both directions.
+
+        # 4. Compute the Kamada-Kawai layout on H using the weight attribute.
+        pos_unique = nx.kamada_kawai_layout(G, dim=2)
+        
+        # 5. Map unique solution positions back to a dictionary keyed by the actual solution tuple.
+        solution_positions = { mapping[i]: pos_unique[i] for i in range(n) }
+        
+        # 6. For every node in G, assign the position corresponding to its solution.
+        pos = {}
+        for node, data in G.nodes(data=True):
+            sol = tuple(data['solution'])
+            pos[node] = solution_positions[sol]
+            
     elif layout == 'kamada_kawai_weighted':
         print('\033[33mUsing Kamada Kawai\033[0m')
         # pos = nx.kamada_kawai_layout(G, dim=2 if not plot_3D else 3)
@@ -1635,31 +1708,6 @@ def update_plot(optimum, PID, opt_goal, options, run_options, STN_lower_fit_limi
             # Compute the mid z coordinate (average fitness)
             mid_z = (z0 + z1) / 2
 
-            def should_label_edge(u, v, STN_hamming, LON_hamming):
-                # Noisy edges should never be labeled.
-                if ("Noisy" in u) or ("Noisy" in v):
-                    return False
-
-                # Determine edge types based on the node labels.
-                is_STN = ("STN" in u)
-                is_LON = ("Local Optimum" in u) or ("Local Optimum" in v)  # you might want to check both endpoints
-
-                # If the edge qualifies as both STN and LON,
-                # only label it if both options are enabled.
-                if is_STN and is_LON:
-                    return STN_hamming and LON_hamming
-
-                # If the edge is STN only, label it only if STN_hamming is True.
-                if is_STN:
-                    return STN_hamming
-
-                # If the edge is LON only, label it only if LON_hamming is True.
-                if is_LON:
-                    return LON_hamming
-
-                # Otherwise (edge does not fall into STN or LON category), label it.
-                return True
-
             if should_label_edge(u, v, STN_hamming, LON_hamming):
                 sol_u = G.nodes[u]['solution']
                 sol_v = G.nodes[v]['solution']
@@ -1712,6 +1760,7 @@ def update_plot(optimum, PID, opt_goal, options, run_options, STN_lower_fit_limi
                 node_sizes.append(attr.get('size', 1))
                 node_colors.append(attr.get('color', 'blue'))
 
+        # print("Node colors for trace:", node_colors)
         LON_node_trace = go.Scatter3d(
             x=LON_node_x,
             y=LON_node_y,
@@ -1894,12 +1943,14 @@ def update_plot(optimum, PID, opt_goal, options, run_options, STN_lower_fit_limi
             x_min_sub, x_max_sub, y_min_sub, y_max_sub, z_min_sub, z_max_sub = 1
         # Axis settings dicts
         xaxis_settings=dict(
-            title='X',
+            # title='X',
+            title='',
             titlefont=dict(size=24, color='black'),
             tickfont=dict(size=16, color='black')
         )
         yaxis_settings=dict(
-            title='Y',
+            # title='Y',
+            title='',
             titlefont=dict(size=24, color='black'),
             tickfont=dict(size=16, color='black')
         )
