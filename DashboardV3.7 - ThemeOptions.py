@@ -139,6 +139,11 @@ tab_selected_style = {
     'backgroundColor': '#ddd'  # for example
 }
 
+themes = {
+    "light": {"background": "#ffffff", "text": "#000000"},
+    "dark": {"background": "#1a1a1a", "text": "#ffffff"},
+}
+
 app.layout = html.Div([
     html.H2("LON/STN Dashboard", style={'textAlign': 'center'}),
     
@@ -159,6 +164,19 @@ app.layout = html.Div([
     dcc.Store(id="STN_series_labels", data=[]),
     dcc.Store(id="noisy_fitnesses_data", data=[]),
     dcc.Store(id="axis-values", data=[]),
+
+    html.Div(
+    id="main-layout",
+    children=[
+        dcc.Tabs(id="tabs", value="tab-info", children=[
+            dcc.Tab(label="Info", value="tab-info"),
+            dcc.Tab(label="Theme Settings", value="tab-theme"),
+        ]),
+        html.Div(id="tabs-content"),
+        dcc.Store(id="selected-theme", data="light")  # Store theme across tabs
+    ],
+    style={"minHeight": "100vh", "padding": "20px"}
+    ),
     
     # Tabbed section for problem selection
     html.Div([
@@ -616,6 +634,61 @@ app.layout = html.Div([
     }),
     html.Div(id='run-print-info', style={'whiteSpace': 'pre-wrap', 'fontFamily': 'monospace'}),
 ])
+
+# ------------------------------
+# Callback: Render Main Tab Content
+# ------------------------------
+
+@app.callback(
+    Output("tabs-content", "children"),
+    Input("tabs", "value"),
+    Input("selected-theme", "data")
+)
+def render_tab_content(tab, theme):
+    style = {
+        "color": themes[theme]["text"]
+    }
+
+    if tab == "tab-info":
+        return html.Div([
+            html.H1("Welcome to the Info Page", style=style),
+            html.P("This is just some placeholder text explaining the app.", style=style),
+        ])
+    elif tab == "tab-theme":
+        return html.Div([
+            html.H2("Choose a Theme", style=style),
+            dcc.RadioItems(
+                id="theme-selector",
+                options=[
+                    {"label": "Light", "value": "light"},
+                    {"label": "Dark", "value": "dark"},
+                ],
+                value=theme,
+                labelStyle={"display": "inline-block", "marginRight": "15px"},
+                style=style
+            )
+        ])
+
+# Callback to update the stored theme
+@app.callback(
+    Output("selected-theme", "data"),
+    Input("theme-selector", "value"),
+    prevent_initial_call=True
+)
+def update_theme(selected_theme):
+    return selected_theme
+
+# Callback to update the background based on theme
+@app.callback(
+    Output("main-layout", "style"),
+    Input("selected-theme", "data")
+)
+def update_background(theme):
+    return {
+        "backgroundColor": themes[theme]["background"],
+        "minHeight": "100vh",
+        "padding": "20px"
+    }
 
 # ------------------------------
 # Callback: Render Problem Tab Content

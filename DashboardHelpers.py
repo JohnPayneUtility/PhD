@@ -51,10 +51,11 @@ def plot2d_box(dataframe, value='final'):
     # assert "my_column" in df.columns, "DataFrame must contain column 'my_column'"
     # group_columns = ['algo_name', 'noise']
     df = dataframe.copy()
-    df = df[['algo_name', 'noise', 'final_fit']]
+    df = df[['algo_name', 'noise', 'final_fit', 'max_fit']]
 
     if value == 'final':
         stats = df.groupby(['algo_name', 'noise'])['final_fit'].agg(['mean', 'std']).reset_index()
+    
     
     # Determine run count
     # first_algo = stats['algo_name'].iloc[0]
@@ -68,7 +69,8 @@ def plot2d_box(dataframe, value='final'):
     fig = px.box(
         df,
         x="noise",
-        y="final_fit",
+        # y="final_fit",
+        y="max_fit",
         color="algo_name",
         category_orders={"noise": noise_levels},
         # points="all"
@@ -82,7 +84,7 @@ def plot2d_box(dataframe, value='final'):
         # ),
         xaxis=dict(
             title=dict(
-                text="Standard Deviation of Noise",
+                text="d, where d x mean(W) is s.d. of noise",
                 font=dict(size=24, color="black")  # Set x-axis title font color
             ),
             tickfont=dict(size=20, color="black")  # Set x-axis tick label color

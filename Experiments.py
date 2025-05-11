@@ -47,7 +47,7 @@ create_LONs = True
 # ==============================
 rastrigin_dims = [2, 3]
 kp_problems = [
-    ('f10_l-d_kp_20_879', 1025),
+    # ('f10_l-d_kp_20_879', 1025),
     ('f1_l-d_kp_10_269', 295),
     # ('f2_l-d_kp_20_878', 1024),
     # ('f3_l-d_kp_4_20', 35),
@@ -56,7 +56,7 @@ kp_problems = [
     # ('f6_l-d_kp_10_60', 52),
     # ('f7_l-d_kp_7_50', 107),
     # ('f8_l-d_kp_23_10000', 9767),
-    ('f9_l-d_kp_5_80', 130),
+    # ('f9_l-d_kp_5_80', 130),
     # ('knapPI_1_10000_1000_1', 563647),
     # ('knapPI_1_1000_1000_1', 54503),
     # ('knapPI_1_100_1000_1', 9147),
@@ -159,7 +159,7 @@ if __name__ == '__main__':
                         n_flips_pert = 2,
                         pert_attempts = 1500,
                         fitness_function = LON_fit_func,
-                        n_runs = 500,
+                        n_runs = 1000,
                         # compression_accs = ['None'])
                         compression_accs = ['None', 0, 1, 2, 5, 10])
     # ---------- Rastrigin ----------
