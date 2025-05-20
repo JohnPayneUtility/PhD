@@ -1,0 +1,37 @@
+problem:
+  prob_name: knapsack
+  prob_type: discrete
+  opt_goal: maximise
+  loader:
+    _target_: ProblemScripts.load_problem_KP
+    filename: f1_l-d_kp_10_269
+  dimensions: null
+  opt_global: null
+  capacity: null
+  mean_value: null
+  mean_weight: null
+  items_dict: null
+  fitness_fn: eval_noisy_kp_v1
+  fitness_params:
+    items_dict: ${problem.items_dict}
+    capacity: ${problem.capacity}
+    noise_intensity: 0
+  attr_function: binary_attribute
+  weights:
+  - 1.0
+algo:
+  name: UMDA
+  init_args:
+    _target_: Algorithms.UMDA
+    pop_size: 100
+    select_size: null
+experiment_name: single_objective_onemax_test_01
+run:
+  max_gens: 100
+  eval_limit: 10000
+  dynamic_eval_limit: null
+  seed: 1
+  num_runs: 10
+  parallel: false
+mlflow:
+  tracking_uri: mlruns

@@ -1,0 +1,30 @@
+problem:
+  prob_name: onemax
+  prob_type: discrete
+  opt_goal: maximise
+  dimensions: 100
+  opt_global: 100
+  mean_value: null
+  mean_weight: null
+  fitness_fn: OneMax_fitness
+  fitness_params:
+    noise_intensity: 0
+  attr_function: binary_attribute
+  weights:
+  - 1.0
+algo:
+  name: UMDA
+  init_args:
+    _target_: Algorithms.UMDA
+    pop_size: 100
+    select_size: null
+experiment_name: single_objective_onemax_test_01
+run:
+  max_gens: 100
+  eval_limit: 10000
+  dynamic_eval_limit: null
+  seed: 1
+  num_runs: 10
+  parallel: false
+mlflow:
+  tracking_uri: mlruns

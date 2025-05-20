@@ -1,0 +1,15 @@
+artifact_uri: file:///C:/Users/Admin/Documents/GitHub/PhD/mlruns/440223060451639630/4b2b8a9faf9941f4b9bedddb2cf25044/artifacts
+end_time: 1747511464912
+entry_point_name: ''
+experiment_id: '440223060451639630'
+lifecycle_stage: active
+run_id: 4b2b8a9faf9941f4b9bedddb2cf25044
+run_name: OnePlusOneEA
+run_uuid: 4b2b8a9faf9941f4b9bedddb2cf25044
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1747511464837
+status: 4
+tags: []
+user_id: Admin

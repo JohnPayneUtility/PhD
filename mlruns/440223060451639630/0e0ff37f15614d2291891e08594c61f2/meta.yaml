@@ -1,0 +1,15 @@
+artifact_uri: file:///C:/Users/Admin/Documents/GitHub/PhD/mlruns/440223060451639630/0e0ff37f15614d2291891e08594c61f2/artifacts
+end_time: 1747358183994
+entry_point_name: ''
+experiment_id: '440223060451639630'
+lifecycle_stage: active
+run_id: 0e0ff37f15614d2291891e08594c61f2
+run_name: UMDA
+run_uuid: 0e0ff37f15614d2291891e08594c61f2
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1747358183286
+status: 3
+tags: []
+user_id: Admin
